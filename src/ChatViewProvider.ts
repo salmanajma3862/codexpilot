@@ -66,6 +66,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     await this.handleAddFileToContext(message.uriString);
                     break;
 
+                case 'insertCode':
+                    console.log('Received insertCode request with code length:', message.code.length);
+                    await this.handleInsertCode(message.code);
+                    break;
+
                 default:
                     console.log('Unhandled message type:', message.type);
             }
@@ -249,6 +254,37 @@ ${userQuery}`;
 
             // Notify the webview that processing is complete
             this.sendMessageToWebview({ type: 'geminiFinishedThinking' });
+        }
+    }
+
+    /**
+     * Handle inserting code into the active editor
+     * @param code The code to insert
+     */
+    private async handleInsertCode(code: string): Promise<void> {
+        // Get the active text editor
+        const editor = vscode.window.activeTextEditor;
+
+        if (!editor) {
+            // No active editor, show a warning
+            vscode.window.showWarningMessage('No active editor found to insert code into.');
+            return;
+        }
+
+        try {
+            // Get the current cursor position
+            const position = editor.selection.active;
+
+            // Insert the code at the cursor position
+            await editor.edit(editBuilder => {
+                editBuilder.insert(position, code);
+            });
+
+            // Show a success message
+            vscode.window.showInformationMessage('Code inserted at cursor position.');
+        } catch (error) {
+            console.error('Error inserting code:', error);
+            vscode.window.showErrorMessage('Failed to insert code: ' + (error instanceof Error ? error.message : 'Unknown error'));
         }
     }
 

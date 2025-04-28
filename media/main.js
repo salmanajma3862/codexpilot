@@ -409,15 +409,93 @@
                 messageElement.classList.add('markdown-message');
 
                 // Apply highlighting to any code blocks that might have been missed
+                // and add action buttons to code blocks
                 setTimeout(() => {
-                    const codeBlocks = textElement.querySelectorAll('pre code');
-                    console.log('Found', codeBlocks.length, 'code blocks for manual highlighting');
+                    const preBlocks = textElement.querySelectorAll('pre');
+                    console.log('Found', preBlocks.length, 'pre blocks for highlighting and buttons');
 
-                    codeBlocks.forEach(block => {
+                    preBlocks.forEach(preBlock => {
                         try {
-                            window.hljs.highlightElement(block);
+                            // Find the code element inside the pre block
+                            const codeBlock = preBlock.querySelector('code');
+                            if (codeBlock) {
+                                // Apply syntax highlighting
+                                window.hljs.highlightElement(codeBlock);
+
+                                // Add a container for the code block and buttons
+                                const codeContainer = document.createElement('div');
+                                codeContainer.className = 'code-block-container';
+
+                                // Create button container
+                                const buttonContainer = document.createElement('div');
+                                buttonContainer.className = 'code-block-buttons';
+
+                                // Create Copy button
+                                const copyButton = document.createElement('button');
+                                copyButton.className = 'code-button copy-button';
+                                copyButton.textContent = 'Copy';
+                                copyButton.title = 'Copy code to clipboard';
+
+                                // Create Insert button
+                                const insertButton = document.createElement('button');
+                                insertButton.className = 'code-button insert-button';
+                                insertButton.textContent = 'Insert';
+                                insertButton.title = 'Insert code at cursor position';
+
+                                // Add event listener for Copy button
+                                copyButton.addEventListener('click', () => {
+                                    const codeText = codeBlock.textContent;
+                                    navigator.clipboard.writeText(codeText)
+                                        .then(() => {
+                                            // Show feedback
+                                            copyButton.textContent = 'Copied!';
+                                            copyButton.classList.add('copied');
+
+                                            // Reset after 2 seconds
+                                            setTimeout(() => {
+                                                copyButton.textContent = 'Copy';
+                                                copyButton.classList.remove('copied');
+                                            }, 2000);
+                                        })
+                                        .catch(err => {
+                                            console.error('Error copying text: ', err);
+                                            copyButton.textContent = 'Error!';
+
+                                            // Reset after 2 seconds
+                                            setTimeout(() => {
+                                                copyButton.textContent = 'Copy';
+                                            }, 2000);
+                                        });
+                                });
+
+                                // Add event listener for Insert button
+                                insertButton.addEventListener('click', () => {
+                                    const codeText = codeBlock.textContent;
+                                    vscode.postMessage({
+                                        type: 'insertCode',
+                                        code: codeText
+                                    });
+
+                                    // Show feedback
+                                    insertButton.textContent = 'Inserting...';
+
+                                    // Reset after 2 seconds
+                                    setTimeout(() => {
+                                        insertButton.textContent = 'Insert';
+                                    }, 2000);
+                                });
+
+                                // Add buttons to button container
+                                buttonContainer.appendChild(copyButton);
+                                buttonContainer.appendChild(insertButton);
+
+                                // Wrap the pre block with our container
+                                preBlock.parentNode.insertBefore(codeContainer, preBlock);
+                                codeContainer.appendChild(preBlock);
+                                codeContainer.appendChild(buttonContainer);
+                            }
                         } catch (error) {
-                            console.error('Error manually highlighting code block:', error);
+                            console.error('Error processing code block:', error);
                         }
                     });
                 }, 0);
@@ -583,15 +661,93 @@
                 errorElement.classList.add('markdown-message');
 
                 // Apply highlighting to any code blocks that might have been missed
+                // and add action buttons to code blocks
                 setTimeout(() => {
-                    const codeBlocks = textElement.querySelectorAll('pre code');
-                    console.log('Found', codeBlocks.length, 'code blocks for manual highlighting in error');
+                    const preBlocks = textElement.querySelectorAll('pre');
+                    console.log('Found', preBlocks.length, 'pre blocks for highlighting and buttons in error');
 
-                    codeBlocks.forEach(block => {
+                    preBlocks.forEach(preBlock => {
                         try {
-                            window.hljs.highlightElement(block);
+                            // Find the code element inside the pre block
+                            const codeBlock = preBlock.querySelector('code');
+                            if (codeBlock) {
+                                // Apply syntax highlighting
+                                window.hljs.highlightElement(codeBlock);
+
+                                // Add a container for the code block and buttons
+                                const codeContainer = document.createElement('div');
+                                codeContainer.className = 'code-block-container';
+
+                                // Create button container
+                                const buttonContainer = document.createElement('div');
+                                buttonContainer.className = 'code-block-buttons';
+
+                                // Create Copy button
+                                const copyButton = document.createElement('button');
+                                copyButton.className = 'code-button copy-button';
+                                copyButton.textContent = 'Copy';
+                                copyButton.title = 'Copy code to clipboard';
+
+                                // Create Insert button
+                                const insertButton = document.createElement('button');
+                                insertButton.className = 'code-button insert-button';
+                                insertButton.textContent = 'Insert';
+                                insertButton.title = 'Insert code at cursor position';
+
+                                // Add event listener for Copy button
+                                copyButton.addEventListener('click', () => {
+                                    const codeText = codeBlock.textContent;
+                                    navigator.clipboard.writeText(codeText)
+                                        .then(() => {
+                                            // Show feedback
+                                            copyButton.textContent = 'Copied!';
+                                            copyButton.classList.add('copied');
+
+                                            // Reset after 2 seconds
+                                            setTimeout(() => {
+                                                copyButton.textContent = 'Copy';
+                                                copyButton.classList.remove('copied');
+                                            }, 2000);
+                                        })
+                                        .catch(err => {
+                                            console.error('Error copying text: ', err);
+                                            copyButton.textContent = 'Error!';
+
+                                            // Reset after 2 seconds
+                                            setTimeout(() => {
+                                                copyButton.textContent = 'Copy';
+                                            }, 2000);
+                                        });
+                                });
+
+                                // Add event listener for Insert button
+                                insertButton.addEventListener('click', () => {
+                                    const codeText = codeBlock.textContent;
+                                    vscode.postMessage({
+                                        type: 'insertCode',
+                                        code: codeText
+                                    });
+
+                                    // Show feedback
+                                    insertButton.textContent = 'Inserting...';
+
+                                    // Reset after 2 seconds
+                                    setTimeout(() => {
+                                        insertButton.textContent = 'Insert';
+                                    }, 2000);
+                                });
+
+                                // Add buttons to button container
+                                buttonContainer.appendChild(copyButton);
+                                buttonContainer.appendChild(insertButton);
+
+                                // Wrap the pre block with our container
+                                preBlock.parentNode.insertBefore(codeContainer, preBlock);
+                                codeContainer.appendChild(preBlock);
+                                codeContainer.appendChild(buttonContainer);
+                            }
                         } catch (error) {
-                            console.error('Error manually highlighting code block in error:', error);
+                            console.error('Error processing code block in error message:', error);
                         }
                     });
                 }, 0);

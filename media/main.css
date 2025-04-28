@@ -369,3 +369,48 @@ body {
 .markdown-message .message-text table tr:nth-child(2n) {
     background-color: var(--vscode-editor-background);
 }
+
+/* Code Block Container and Buttons */
+.code-block-container {
+    position: relative;
+    margin-bottom: 16px;
+}
+
+.code-block-buttons {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    display: flex;
+    gap: 5px;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    z-index: 10;
+}
+
+.code-block-container:hover .code-block-buttons {
+    opacity: 1;
+}
+
+.code-button {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 3px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out;
+}
+
+.code-button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+.copy-button.copied {
+    background-color: var(--vscode-statusBarItem-prominentBackground);
+}
+
+/* Ensure code blocks in the container are properly styled */
+.code-block-container pre {
+    margin: 0;
+}
