@@ -6,11 +6,115 @@ import { ChatViewProvider } from './ChatViewProvider';
 // Constants for secret storage
 const SECRET_STORAGE_KEY = 'codexpilotGeminiApiKey';
 
+// Store context file URIs
+let contextFileUris: vscode.Uri[] = [];
+
+// Store a reference to the ChatViewProvider instance
+let chatProviderInstance: ChatViewProvider | null = null;
+
 /**
  * Helper function to retrieve the API key from secure storage
  */
-async function getApiKey(context: vscode.ExtensionContext): Promise<string | undefined> {
+export async function getApiKey(context: vscode.ExtensionContext): Promise<string | undefined> {
     return await context.secrets.get(SECRET_STORAGE_KEY);
+}
+
+/**
+ * Get the current context file URIs
+ */
+export function getContextFileUris(): vscode.Uri[] {
+    return [...contextFileUris];
+}
+
+/**
+ * Update the context files list in the webview
+ */
+function updateContextInWebview() {
+    if (chatProviderInstance) {
+        // Convert URIs to relative paths for display
+        const fileNames = contextFileUris.map(uri => vscode.workspace.asRelativePath(uri));
+
+        // Send the update to the webview
+        chatProviderInstance.sendMessageToWebview({
+            type: 'contextUpdated',
+            files: fileNames
+        });
+    }
+}
+
+/**
+ * Add a file to the context
+ * @param fileUri The URI of the file to add
+ * @returns A promise that resolves to a boolean indicating whether the file was added
+ */
+export async function addFileToContext(fileUri: vscode.Uri): Promise<boolean> {
+    try {
+        // Check if it's a file (not a directory)
+        const stat = await vscode.workspace.fs.stat(fileUri);
+        if (stat.type === vscode.FileType.File) {
+            // Check if the file is already in the context
+            const fileUriString = fileUri.toString();
+            const isAlreadyInContext = contextFileUris.some(uri => uri.toString() === fileUriString);
+
+            if (!isAlreadyInContext) {
+                // Add the file to the context
+                contextFileUris.push(fileUri);
+
+                // Update the webview
+                updateContextInWebview();
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        console.error('Error adding file to context:', error);
+        return false;
+    }
+}
+
+/**
+ * Clear all files from the context
+ */
+export function clearContext() {
+    contextFileUris = [];
+    updateContextInWebview();
+}
+
+/**
+ * Search for files in the workspace
+ * @param query The search query
+ * @param maxResults The maximum number of results to return
+ * @returns A promise that resolves to an array of file URIs
+ */
+export async function searchWorkspaceFiles(query: string, maxResults: number = 10): Promise<vscode.Uri[]> {
+    console.log('searchWorkspaceFiles called with query:', query, 'maxResults:', maxResults);
+
+    // Create a glob pattern that includes the query
+    // Using a more inclusive pattern to match files containing the query in their path
+    const searchPattern = `**/*${query}*.*`;
+
+    console.log('Search pattern:', searchPattern);
+    console.log('Exclude pattern:', '**/node_modules/**');
+
+    try {
+        // Search for files matching the pattern
+        console.log('Calling vscode.workspace.findFiles...');
+        const files = await vscode.workspace.findFiles(
+            searchPattern,
+            '**/node_modules/**', // Exclude node_modules
+            maxResults
+        );
+
+        console.log('Files found:', files.length);
+        if (files.length > 0) {
+            console.log('First few files:', files.slice(0, 5).map(uri => uri.toString()));
+        }
+
+        return files;
+    } catch (error) {
+        console.error('Error searching workspace files:', error);
+        return [];
+    }
 }
 
 // This method is called when your extension is activated
@@ -24,14 +128,24 @@ export function activate(context: vscode.ExtensionContext) {
 	// Show a notification to confirm the extension is activated
 	vscode.window.showInformationMessage('Codexpilot extension is now active!');
 
-	// Register the ChatViewProvider
-	const chatViewProvider = new ChatViewProvider(context.extensionUri);
+	// Register the ChatViewProvider with access to context management functions
+	const chatViewProvider = new ChatViewProvider(
+        context.extensionUri,
+        context,
+        {
+            searchWorkspaceFiles,
+            addFileToContext
+        }
+    );
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(
 			ChatViewProvider.viewType,
 			chatViewProvider
 		)
 	);
+
+    // Store the provider instance for later use
+    chatProviderInstance = chatViewProvider;
 
 	// The command has been defined in the package.json file
 	// Now provide the implementation of the command with registerCommand
@@ -56,15 +170,26 @@ export function activate(context: vscode.ExtensionContext) {
 		if (apiKey) {
 			// Store the API key securely
 			await context.secrets.store(SECRET_STORAGE_KEY, apiKey);
-			vscode.window.showInformationMessage('Codexpilot: Gemini API Key stored successfully.');
+			vscode.window.showInformationMessage('Codexpilot: API Key stored successfully.');
 		} else {
 			// User cancelled or didn't provide a key
 			vscode.window.showWarningMessage('Codexpilot: API Key not provided.');
 		}
 	});
 
+    // Register the command to clear the context
+    const clearContextCommand = vscode.commands.registerCommand('codexpilot.clearContext', () => {
+        // Clear the context files array
+        clearContext();
+        vscode.window.showInformationMessage('Codexpilot: Context cleared.');
+    });
+
 	// Add all disposables to the subscriptions
-	context.subscriptions.push(helloWorldCommand, setApiKeyCommand);
+	context.subscriptions.push(
+        helloWorldCommand,
+        setApiKeyCommand,
+        clearContextCommand
+    );
 }
 
 // This method is called when your extension is deactivated

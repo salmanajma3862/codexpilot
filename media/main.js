@@ -11,36 +11,325 @@
     const userInputElement = document.getElementById('user-input');
     const sendButtonElement = document.getElementById('send-button');
 
+    // Create file search results container
+    const fileSearchContainer = document.createElement('div');
+    fileSearchContainer.id = 'file-search-container';
+    fileSearchContainer.className = 'file-search-container';
+    fileSearchContainer.style.display = 'none';
+    document.getElementById('input-area').appendChild(fileSearchContainer);
+
     // Initialize state
     let contextFiles = [];
     let chatHistory = [];
+    let isSearching = false;
+    let currentSearchQuery = '';
 
     // Event listeners
     sendButtonElement.addEventListener('click', sendMessage);
     userInputElement.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
+            // If the file search is open, don't send the message
+            if (fileSearchContainer.style.display === 'block') {
+                e.preventDefault();
+                return;
+            }
             e.preventDefault();
             sendMessage();
+        } else if (e.key === 'Escape') {
+            // Close the file search if it's open
+            if (fileSearchContainer.style.display === 'block') {
+                hideFileSearch();
+                e.preventDefault();
+            }
         }
     });
+
+    // Add input event listener for @ mentions
+    userInputElement.addEventListener('input', handleInputChange);
+
+    // Function to handle input changes and detect @ mentions
+    function handleInputChange() {
+        const text = userInputElement.value;
+        const cursorPosition = userInputElement.selectionStart;
+
+        // Find the @ symbol before the cursor
+        const textBeforeCursor = text.substring(0, cursorPosition);
+        const atIndex = textBeforeCursor.lastIndexOf('@');
+
+        console.log('Input change detected:', {
+            text,
+            cursorPosition,
+            atIndex,
+            textBeforeCursor
+        });
+
+        // If there's an @ symbol and it's either at the start of the text or preceded by a space
+        if (atIndex !== -1 && (atIndex === 0 || textBeforeCursor[atIndex - 1] === ' ')) {
+            // Extract the search query (text between @ and cursor)
+            const query = textBeforeCursor.substring(atIndex + 1);
+
+            console.log('@ pattern detected! Query:', query);
+
+            // If the query is not empty and different from the current search
+            if (query && query !== currentSearchQuery) {
+                console.log('New search query detected:', query);
+                currentSearchQuery = query;
+                searchFiles(query);
+            } else if (!query) {
+                console.log('Empty query, hiding search results');
+                // If the query is empty, hide the search results
+                hideFileSearch();
+            }
+        } else {
+            console.log('No @ pattern detected or not at word boundary, hiding search results');
+            // If there's no @ symbol before the cursor, hide the search results
+            hideFileSearch();
+        }
+    }
+
+    // Function to search for files
+    function searchFiles(query) {
+        console.log('Searching files with query:', query);
+
+        // Show loading indicator
+        showFileSearchLoading();
+
+        // Send search request to extension
+        const message = {
+            type: 'searchWorkspaceFiles',
+            query: query
+        };
+
+        console.log('Sending message to extension:', message);
+        vscode.postMessage(message);
+    }
+
+    // Function to show loading indicator
+    function showFileSearchLoading() {
+        console.log('Showing file search loading indicator');
+        isSearching = true;
+        fileSearchContainer.style.display = 'block';
+        fileSearchContainer.innerHTML = '<div class="loading">Searching files...</div>';
+
+        // Position the container below the input
+        positionFileSearchContainer();
+
+        // Add a temporary border for debugging
+        fileSearchContainer.style.border = '2px solid blue';
+
+        console.log('File search container:', {
+            display: fileSearchContainer.style.display,
+            position: fileSearchContainer.style.position,
+            top: fileSearchContainer.style.top,
+            left: fileSearchContainer.style.left,
+            width: fileSearchContainer.style.width,
+            height: fileSearchContainer.style.height
+        });
+    }
+
+    // Function to hide file search
+    function hideFileSearch() {
+        isSearching = false;
+        currentSearchQuery = '';
+        fileSearchContainer.style.display = 'none';
+    }
+
+    // Function to position the file search container
+    function positionFileSearchContainer() {
+        console.log('Positioning file search container');
+
+        // Get the input element's position relative to its parent
+        const inputRect = userInputElement.getBoundingClientRect();
+        const containerRect = document.getElementById('input-area').getBoundingClientRect();
+
+        // Calculate position relative to the input area
+        const top = inputRect.bottom - containerRect.top;
+        const left = inputRect.left - containerRect.left;
+
+        console.log('Positioning data:', {
+            inputRect,
+            containerRect,
+            calculatedTop: top,
+            calculatedLeft: left
+        });
+
+        // Set the position
+        fileSearchContainer.style.position = 'absolute';
+        fileSearchContainer.style.top = `${top}px`;
+        fileSearchContainer.style.left = `${left}px`;
+        fileSearchContainer.style.width = `${inputRect.width}px`;
+        fileSearchContainer.style.maxHeight = '200px';
+        fileSearchContainer.style.overflowY = 'auto';
+        fileSearchContainer.style.zIndex = '1000';
+        fileSearchContainer.style.backgroundColor = 'var(--vscode-editor-background)';
+        fileSearchContainer.style.border = '3px solid var(--vscode-button-background)'; // Make border more visible for debugging
+        fileSearchContainer.style.borderRadius = '4px';
+        fileSearchContainer.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+
+        // Ensure the container is visible
+        fileSearchContainer.style.display = 'block';
+    }
+
+    // Function to display file search results
+    function displayFileSearchResults(results) {
+        console.log('displayFileSearchResults called with results:', results);
+
+        if (!isSearching) {
+            console.log('Not searching, ignoring results');
+            return;
+        }
+
+        if (!results || results.length === 0) {
+            console.log('No results found, showing empty message');
+            fileSearchContainer.innerHTML = '<div class="no-results">No files found</div>';
+
+            // Make sure the container is visible
+            fileSearchContainer.style.display = 'block';
+            positionFileSearchContainer();
+
+            // Add a temporary border for debugging
+            fileSearchContainer.style.border = '2px solid red';
+
+            return;
+        }
+
+        console.log('Creating results list with', results.length, 'items');
+        fileSearchContainer.innerHTML = '';
+        const resultsList = document.createElement('ul');
+        resultsList.className = 'file-search-results';
+        resultsList.style.listStyle = 'none';
+        resultsList.style.padding = '0';
+        resultsList.style.margin = '0';
+
+        results.forEach((result, index) => {
+            console.log('Adding result item:', result.path);
+            const resultItem = document.createElement('li');
+            resultItem.className = 'file-search-result';
+            resultItem.textContent = result.path;
+            resultItem.style.padding = '8px 12px';
+            resultItem.style.cursor = 'pointer';
+            resultItem.style.borderBottom = index < results.length - 1 ? '1px solid var(--vscode-panel-border)' : 'none';
+
+            // Highlight on hover
+            resultItem.addEventListener('mouseover', () => {
+                resultItem.style.backgroundColor = 'var(--vscode-list-hoverBackground)';
+            });
+
+            resultItem.addEventListener('mouseout', () => {
+                resultItem.style.backgroundColor = 'transparent';
+            });
+
+            // Add click handler
+            resultItem.addEventListener('click', () => {
+                console.log('File selected:', result);
+                selectFile(result);
+            });
+
+            resultsList.appendChild(resultItem);
+        });
+
+        fileSearchContainer.appendChild(resultsList);
+
+        // Make sure the container is visible
+        fileSearchContainer.style.display = 'block';
+        positionFileSearchContainer();
+
+        // Add a temporary border for debugging
+        fileSearchContainer.style.border = '2px solid green';
+
+        console.log('Results list created and added to DOM');
+    }
+
+    // Function to select a file from the search results
+    function selectFile(file) {
+        // Replace the @query with the file path
+        const text = userInputElement.value;
+        const cursorPosition = userInputElement.selectionStart;
+        const textBeforeCursor = text.substring(0, cursorPosition);
+        const atIndex = textBeforeCursor.lastIndexOf('@');
+
+        if (atIndex !== -1) {
+            // Replace the @query with the file path
+            const newText = text.substring(0, atIndex) + '@' + file.path + ' ' + text.substring(cursorPosition);
+            userInputElement.value = newText;
+
+            // Set cursor position after the inserted file path
+            const newCursorPosition = atIndex + file.path.length + 2; // +2 for @ and space
+            userInputElement.setSelectionRange(newCursorPosition, newCursorPosition);
+
+            // Add the file to the context
+            vscode.postMessage({
+                type: 'addFileToContextViaMention',
+                uriString: file.uriString
+            });
+
+            // Hide the search results
+            hideFileSearch();
+
+            // Focus the input
+            userInputElement.focus();
+        }
+    }
 
     // Handle messages from the extension
     window.addEventListener('message', event => {
         const message = event.data;
 
+        console.log('Webview received message from extension:', message);
+
         switch (message.type) {
             case 'updateContextFiles':
+                console.log('Handling updateContextFiles with files:', message.files);
+                updateContextFiles(message.files);
+                break;
+            case 'contextUpdated':
+                console.log('Handling contextUpdated with files:', message.files);
                 updateContextFiles(message.files);
                 break;
             case 'addChatMessage':
+                console.log('Handling addChatMessage:', message);
                 addChatMessage(message.sender, message.text);
                 break;
             case 'assistantResponse':
+                console.log('Handling assistantResponse:', message.text);
                 addChatMessage('assistant', message.text);
                 break;
+            case 'geminiThinking':
+                console.log('Handling geminiThinking');
+                showThinkingIndicator();
+                break;
+            case 'geminiResponse':
+                console.log('Handling geminiResponse:', message.text);
+                hideThinkingIndicator();
+                addChatMessage('assistant', message.text);
+                break;
+            case 'geminiError':
+                console.log('Handling geminiError:', message.text);
+                hideThinkingIndicator();
+                showErrorMessage(message.text);
+                break;
+            case 'geminiFinishedThinking':
+                console.log('Handling geminiFinishedThinking');
+                hideThinkingIndicator();
+                break;
             case 'clearChat':
+                console.log('Handling clearChat');
                 clearChat();
                 break;
+            case 'fileSearchResults':
+                console.log('Handling fileSearchResults with results:', message.results);
+                console.log('Number of results:', message.results ? message.results.length : 0);
+                displayFileSearchResults(message.results);
+                break;
+            case 'fileAddedToContext':
+                if (message.success) {
+                    console.log(`File added to context: ${message.path}`);
+                } else {
+                    console.error('Failed to add file to context:', message.error);
+                }
+                break;
+            default:
+                console.log('Unhandled message type:', message.type);
         }
     });
 
@@ -100,6 +389,7 @@
     }
 
     function updateContextFiles(files) {
+        console.log('Updating context files:', files);
         contextFiles = files;
 
         if (files.length === 0) {
@@ -116,6 +406,9 @@
 
             contextFilesList.appendChild(list);
         }
+
+        // Save state after updating context files
+        saveState();
     }
 
     function clearChat() {
@@ -133,6 +426,73 @@
 
         // Clear chat history
         chatHistory = [];
+
+        // Save state
+        saveState();
+    }
+
+    // Function to show thinking indicator
+    function showThinkingIndicator() {
+        // Disable input and send button
+        userInputElement.disabled = true;
+        sendButtonElement.disabled = true;
+
+        // Add a thinking message
+        const thinkingElement = document.createElement('div');
+        thinkingElement.className = 'message assistant-message thinking-message';
+        thinkingElement.id = 'thinking-indicator';
+
+        const senderElement = document.createElement('div');
+        senderElement.className = 'message-sender';
+        senderElement.textContent = 'Assistant';
+
+        const textElement = document.createElement('div');
+        textElement.className = 'message-text';
+        textElement.innerHTML = '<div class="thinking-dots"><span>.</span><span>.</span><span>.</span></div> Thinking...';
+
+        thinkingElement.appendChild(senderElement);
+        thinkingElement.appendChild(textElement);
+
+        chatHistoryElement.appendChild(thinkingElement);
+
+        // Scroll to bottom
+        chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
+    }
+
+    // Function to hide thinking indicator
+    function hideThinkingIndicator() {
+        // Enable input and send button
+        userInputElement.disabled = false;
+        sendButtonElement.disabled = false;
+
+        // Remove thinking message if it exists
+        const thinkingElement = document.getElementById('thinking-indicator');
+        if (thinkingElement) {
+            thinkingElement.remove();
+        }
+    }
+
+    // Function to show error message
+    function showErrorMessage(errorText) {
+        // Add error message
+        const errorElement = document.createElement('div');
+        errorElement.className = 'message error-message';
+
+        const senderElement = document.createElement('div');
+        senderElement.className = 'message-sender';
+        senderElement.textContent = 'Error';
+
+        const textElement = document.createElement('div');
+        textElement.className = 'message-text';
+        textElement.textContent = errorText;
+
+        errorElement.appendChild(senderElement);
+        errorElement.appendChild(textElement);
+
+        chatHistoryElement.appendChild(errorElement);
+
+        // Scroll to bottom
+        chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
 
         // Save state
         saveState();

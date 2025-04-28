@@ -149,3 +149,90 @@ body {
     background-color: var(--vscode-button-background);
     transform: translateY(1px);
 }
+
+/* File Search Styles */
+.file-search-container {
+    background-color: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.file-search-results {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.file-search-result {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.file-search-result:last-child {
+    border-bottom: none;
+}
+
+.file-search-result:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.loading, .no-results {
+    padding: 10px;
+    text-align: center;
+    color: var(--vscode-descriptionForeground);
+}
+
+/* Thinking Indicator Styles */
+.thinking-message {
+    opacity: 0.8;
+}
+
+.thinking-dots {
+    display: inline-block;
+}
+
+.thinking-dots span {
+    animation: thinking 1.4s infinite;
+    animation-fill-mode: both;
+    display: inline-block;
+    margin-right: 2px;
+}
+
+.thinking-dots span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.thinking-dots span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes thinking {
+    0% {
+        opacity: 0.2;
+    }
+    20% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0.2;
+    }
+}
+
+/* Error Message Styles */
+.error-message {
+    align-self: center;
+    background-color: var(--vscode-errorForeground);
+    color: var(--vscode-editor-background);
+    padding: 10px 16px;
+    border-radius: 6px;
+    max-width: 80%;
+}
+
+.error-message .message-sender {
+    color: var(--vscode-editor-background);
+    font-weight: bold;
+}
