@@ -179,33 +179,33 @@
     function positionFileSearchContainer() {
         console.log('Positioning file search container');
 
-        // Get the input element's position relative to its parent
-        const inputRect = userInputElement.getBoundingClientRect();
+        // Get the input wrapper element's position
+        const inputWrapperRect = document.getElementById('input-wrapper').getBoundingClientRect();
         const containerRect = document.getElementById('input-area').getBoundingClientRect();
 
-        // Calculate position relative to the input area
-        const top = inputRect.bottom - containerRect.top;
-        const left = inputRect.left - containerRect.left;
+        // Calculate position to place it above the input wrapper
+        const bottom = containerRect.bottom - inputWrapperRect.top;
+        const left = inputWrapperRect.left - containerRect.left;
 
         console.log('Positioning data:', {
-            inputRect,
+            inputWrapperRect,
             containerRect,
-            calculatedTop: top,
+            calculatedBottom: bottom,
             calculatedLeft: left
         });
 
         // Set the position
         fileSearchContainer.style.position = 'absolute';
-        fileSearchContainer.style.top = `${top}px`;
+        fileSearchContainer.style.bottom = `${bottom}px`; // Position above input
         fileSearchContainer.style.left = `${left}px`;
-        fileSearchContainer.style.width = `${inputRect.width}px`;
+        fileSearchContainer.style.width = `${inputWrapperRect.width}px`;
         fileSearchContainer.style.maxHeight = '200px';
         fileSearchContainer.style.overflowY = 'auto';
         fileSearchContainer.style.zIndex = '1000';
         fileSearchContainer.style.backgroundColor = 'var(--vscode-editor-background)';
-        fileSearchContainer.style.border = '3px solid var(--vscode-button-background)'; // Make border more visible for debugging
-        fileSearchContainer.style.borderRadius = '4px';
-        fileSearchContainer.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+        fileSearchContainer.style.border = '1px solid var(--vscode-input-border)';
+        fileSearchContainer.style.borderRadius = '6px';
+        fileSearchContainer.style.boxShadow = '0 -2px 8px rgba(0, 0, 0, 0.15)';
 
         // Ensure the container is visible
         fileSearchContainer.style.display = 'block';
