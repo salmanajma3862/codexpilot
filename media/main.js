@@ -26,6 +26,12 @@
     let currentAssistantMessageElement = null;
     let accumulatedResponseText = '';
 
+    // Animation state for smooth character-by-character display
+    let characterQueue = []; // Stores characters to be displayed
+    let isAnimating = false; // Flag to prevent multiple animation loops
+    let animationIntervalId = null; // To store the interval ID
+    const charAnimationDelay = 10; // Milliseconds between characters (adjust for speed)
+
     // Event listeners
     sendButtonElement.addEventListener('click', sendMessage);
     userInputElement.addEventListener('keydown', (e) => {
@@ -351,6 +357,13 @@
                 break;
             case 'geminiThinking':
                 console.log('Handling geminiThinking');
+                // Stop any ongoing animation
+                stopCharacterAnimation();
+                // Reset streaming state
+                if (currentAssistantMessageElement) {
+                    currentAssistantMessageElement = null;
+                    accumulatedResponseText = '';
+                }
                 showThinkingIndicator();
                 break;
             case 'geminiStreamStart':
@@ -378,6 +391,8 @@
             case 'geminiError':
                 console.log('Handling geminiError:', message.text);
                 hideThinkingIndicator();
+                // Stop any ongoing animation
+                stopCharacterAnimation();
                 // If we were in the middle of streaming, clean up
                 if (currentAssistantMessageElement) {
                     currentAssistantMessageElement.remove();
@@ -699,10 +714,69 @@
         }
     }
 
+    // Function to start the character animation
+    function startCharacterAnimation() {
+        // If already animating, don't start another animation loop
+        if (isAnimating) {
+            return;
+        }
+
+        // Set the animation flag
+        isAnimating = true;
+
+        // Clear any existing animation interval
+        if (animationIntervalId) {
+            clearInterval(animationIntervalId);
+        }
+
+        // Start the animation interval
+        animationIntervalId = setInterval(() => {
+            // If there are no more characters to display, stop the animation
+            if (characterQueue.length === 0) {
+                clearInterval(animationIntervalId);
+                animationIntervalId = null;
+                isAnimating = false;
+                return;
+            }
+
+            // Get the next character from the queue
+            const char = characterQueue.shift();
+
+            // If we have a message element, append the character
+            if (currentAssistantMessageElement) {
+                const textElement = currentAssistantMessageElement.querySelector('.message-text');
+                textElement.textContent += char;
+
+                // Scroll to bottom
+                chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
+            } else {
+                // If there's no message element, clear the queue and stop animating
+                characterQueue = [];
+                clearInterval(animationIntervalId);
+                animationIntervalId = null;
+                isAnimating = false;
+            }
+        }, charAnimationDelay);
+    }
+
+    // Function to stop any ongoing animation
+    function stopCharacterAnimation() {
+        if (animationIntervalId) {
+            clearInterval(animationIntervalId);
+            animationIntervalId = null;
+        }
+        isAnimating = false;
+        characterQueue = [];
+    }
+
     // Function to start streaming response
     function startStreamingResponse() {
-        // Reset accumulated text
+        // Stop any existing animation
+        stopCharacterAnimation();
+
+        // Reset accumulated text and character queue
         accumulatedResponseText = '';
+        characterQueue = [];
 
         // Create message element
         const messageElement = document.createElement('div');
@@ -735,19 +809,23 @@
             return;
         }
 
-        // Add the chunk to the accumulated text
+        // Add the chunk to the accumulated text (for final rendering)
         accumulatedResponseText += chunk;
 
-        // Update the text element with the accumulated text
-        const textElement = currentAssistantMessageElement.querySelector('.message-text');
-        textElement.textContent = accumulatedResponseText;
+        // Add each character to the animation queue
+        characterQueue.push(...chunk.split(''));
 
-        // Scroll to bottom
-        chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
+        // Start the animation if it's not already running
+        if (!isAnimating) {
+            startCharacterAnimation();
+        }
     }
 
     // Function to finalize the streaming response with markdown rendering
     function finalizeStreamingResponse() {
+        // Stop any ongoing animation first
+        stopCharacterAnimation();
+
         if (!currentAssistantMessageElement || !accumulatedResponseText) {
             console.log('No streaming response to finalize');
             return;

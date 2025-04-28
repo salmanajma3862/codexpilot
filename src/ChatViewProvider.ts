@@ -255,14 +255,24 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             const contextContent = await this.readContextFiles();
 
             // Construct the full prompt
-            const systemMessage = `You are a helpful coding assistant. You help users understand and modify code.
-Be concise and clear in your explanations. If you're not sure about something, say so.
-When showing code examples, use proper formatting.`;
+            const systemMessage = `You are a helpful coding assistant in an IDE. You help users understand and modify code.
+Be explanatory and clear in your explanations.
+When showing code examples, use proper formatting with markdown.
+If the user asks about code and there's no context provided, just answer based on your general knowledge.`;
 
-            const fullPrompt = `${systemMessage}
+            // Determine if we have actual context files or just the default message
+            const hasRealContext = contextContent !== "No context files provided.";
+
+            // Construct the prompt differently based on whether we have context
+            const fullPrompt = hasRealContext
+                ? `${systemMessage}
 
 CONTEXT FILES:
 ${contextContent}
+
+USER QUERY:
+${userQuery}`
+                : `${systemMessage}
 
 USER QUERY:
 ${userQuery}`;
