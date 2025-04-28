@@ -11,6 +11,9 @@ export function activate(context: vscode.ExtensionContext) {
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "codexpilot" is now active!');
 
+	// Show a notification to confirm the extension is activated
+	vscode.window.showInformationMessage('Codexpilot extension is now active!');
+
 	// Register the ChatViewProvider
 	const chatViewProvider = new ChatViewProvider(context.extensionUri);
 	context.subscriptions.push(
