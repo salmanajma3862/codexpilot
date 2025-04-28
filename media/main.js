@@ -52,8 +52,38 @@
         }
     });
 
-    // Add input event listener for @ mentions
+    // Add input event listeners
     userInputElement.addEventListener('input', handleInputChange);
+    userInputElement.addEventListener('input', autoResizeTextarea);
+
+    // Function to auto-resize the textarea based on content
+    function autoResizeTextarea() {
+        // Reset height to auto to get the correct scrollHeight
+        userInputElement.style.height = 'auto';
+
+        // Set the height to match the content (with a max height)
+        const newHeight = Math.min(userInputElement.scrollHeight, 150);
+        userInputElement.style.height = newHeight + 'px';
+
+        // Ensure the input wrapper doesn't exceed max height
+        const inputWrapper = document.getElementById('input-wrapper');
+        if (inputWrapper) {
+            const pillsHeight = document.getElementById('context-pills').offsetHeight;
+            const maxWrapperHeight = 200; // Should match CSS max-height for #input-wrapper
+
+            // Adjust textarea max height based on pills height
+            const maxTextareaHeight = maxWrapperHeight - pillsHeight - 16; // 16px for padding
+            if (newHeight > maxTextareaHeight) {
+                userInputElement.style.height = maxTextareaHeight + 'px';
+                userInputElement.style.overflowY = 'auto';
+            } else {
+                userInputElement.style.overflowY = 'hidden';
+            }
+        }
+    }
+
+    // Initialize textarea height
+    autoResizeTextarea();
 
     // Function to handle input changes and detect @ mentions
     function handleInputChange() {

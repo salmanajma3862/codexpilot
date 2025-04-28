@@ -47,9 +47,8 @@ body {
 /* Message Styling */
 .message {
     margin-bottom: 16px;
-    padding: 10px;
-    border-radius: 6px;
-    max-width: 85%;
+    padding: 12px;
+    border-radius: 8px;
     word-wrap: break-word;
 }
 
@@ -57,6 +56,8 @@ body {
     align-self: flex-end;
     background-color: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
+    max-width: 85%;
+    margin-left: 15%;
 }
 
 .assistant-message {
@@ -64,6 +65,8 @@ body {
     background-color: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border);
+    max-width: 95%;
+    margin-right: 5%;
 }
 
 .message-sender {
@@ -80,30 +83,31 @@ body {
 /* Input Area Section */
 #input-area {
     display: flex;
-    padding: 10px;
+    padding: 12px;
     border-top: 1px solid var(--vscode-panel-border);
     background-color: var(--vscode-editor-background);
+    position: relative;
 }
 
-#input-container {
+#input-wrapper {
     display: flex;
+    flex-direction: column;
     flex: 1;
-    flex-wrap: wrap;
-    align-items: center;
-    min-height: 60px;
-    max-height: 150px;
-    padding: 4px 8px;
+    position: relative;
     border: 1px solid var(--vscode-input-border);
-    border-radius: 4px;
+    border-radius: 6px;
     background-color: var(--vscode-input-background);
-    overflow-y: auto;
+    overflow: hidden;
+    min-height: 40px;
+    max-height: 200px;
 }
 
 #context-pills {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    align-items: center;
+    padding: 6px 8px 2px 8px;
+    min-height: 28px;
 }
 
 .context-pill {
@@ -112,13 +116,14 @@ body {
     background-color: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
     border-radius: 12px;
-    padding: 2px 8px;
+    padding: 3px 10px;
     margin: 2px;
     font-size: 12px;
     max-width: 200px;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .pill-filename {
@@ -141,17 +146,18 @@ body {
 }
 
 #user-input {
-    flex: 1;
-    min-width: 200px;
-    min-height: 24px;
-    padding: 4px;
+    width: 100%;
+    min-height: 40px;
+    padding: 8px 40px 8px 12px;
     border: none;
     background-color: transparent;
     color: var(--vscode-input-foreground);
     resize: none;
     font-family: inherit;
     font-size: 14px;
-    line-height: 1.4;
+    line-height: 1.5;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 #user-input:focus {
@@ -159,17 +165,26 @@ body {
 }
 
 #send-button {
-    margin-left: 8px;
-    padding: 0 16px;
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     background-color: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
     border: none;
-    border-radius: 2px;
+    border-radius: 50%;
     cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    height: 28px;
-    align-self: flex-end;
+    font-size: 16px;
+    transition: background-color 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+#send-button .codicon {
+    font-size: 16px;
 }
 
 #send-button:hover {

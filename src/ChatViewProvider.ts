@@ -376,6 +376,37 @@ ${userQuery}`;
             <title>Codexpilot Chat</title>
             <link rel="stylesheet" type="text/css" href="${styleUri}">
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/vs2015.min.css">
+            <style>
+                /* VS Code Codicon styles */
+                .codicon {
+                    font-family: 'codicon';
+                    font-size: 16px;
+                    font-style: normal;
+                    font-weight: normal;
+                    display: inline-block;
+                    text-decoration: none;
+                    text-rendering: auto;
+                    text-align: center;
+                    -webkit-font-smoothing: antialiased;
+                    -moz-osx-font-smoothing: grayscale;
+                    user-select: none;
+                    -webkit-user-select: none;
+                }
+
+                /* Codicon: send */
+                .codicon-send:before { content: '\\ea77'; }
+
+                /* Fallback if codicon font is not available */
+                @font-face {
+                    font-family: 'codicon';
+                    src: url('${webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'codicon.ttf'))}');
+                }
+
+                /* Fallback content for send icon */
+                .codicon-send:not(:before) {
+                    content: '→';
+                }
+            </style>
         </head>
         <body>
             <div id="webview-container">
@@ -387,13 +418,15 @@ ${userQuery}`;
                     </div>
                 </div>
                 <div id="input-area">
-                    <div id="input-container">
+                    <div id="input-wrapper">
                         <div id="context-pills">
                             <!-- Context file pills will be added here dynamically -->
                         </div>
                         <textarea id="user-input" placeholder="Ask Codexpilot... (Use @ to add files to context)"></textarea>
+                        <button id="send-button" title="Send Message">
+                            <i class="codicon codicon-send"></i>
+                        </button>
                     </div>
-                    <button id="send-button">Send</button>
                 </div>
             </div>
             <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
