@@ -5,17 +5,19 @@
     const vscode = acquireVsCodeApi();
 
     // DOM Elements
-    const messageInput = document.getElementById('message-input');
-    const sendButton = document.getElementById('send-button');
-    const chatMessages = document.getElementById('chat-messages');
+    const contextFilesElement = document.getElementById('context-files');
     const contextFilesList = document.getElementById('context-files-list');
+    const chatHistoryElement = document.getElementById('chat-history');
+    const userInputElement = document.getElementById('user-input');
+    const sendButtonElement = document.getElementById('send-button');
 
     // Initialize state
     let contextFiles = [];
+    let chatHistory = [];
 
     // Event listeners
-    sendButton.addEventListener('click', sendMessage);
-    messageInput.addEventListener('keydown', (e) => {
+    sendButtonElement.addEventListener('click', sendMessage);
+    userInputElement.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
@@ -33,6 +35,9 @@
             case 'addChatMessage':
                 addChatMessage(message.sender, message.text);
                 break;
+            case 'assistantResponse':
+                addChatMessage('assistant', message.text);
+                break;
             case 'clearChat':
                 clearChat();
                 break;
@@ -41,7 +46,7 @@
 
     // Functions
     function sendMessage() {
-        const text = messageInput.value.trim();
+        const text = userInputElement.value.trim();
         if (text) {
             // Add message to UI
             addChatMessage('user', text);
@@ -53,11 +58,18 @@
             });
 
             // Clear input
-            messageInput.value = '';
+            userInputElement.value = '';
         }
     }
 
     function addChatMessage(sender, text) {
+        // Remove welcome message if it exists
+        const welcomeMessage = chatHistoryElement.querySelector('.welcome-message');
+        if (welcomeMessage) {
+            chatHistoryElement.removeChild(welcomeMessage);
+        }
+
+        // Create message element
         const messageElement = document.createElement('div');
         messageElement.className = `message ${sender}-message`;
 
@@ -72,10 +84,19 @@
         messageElement.appendChild(senderElement);
         messageElement.appendChild(textElement);
 
-        chatMessages.appendChild(messageElement);
+        chatHistoryElement.appendChild(messageElement);
+
+        // Add to chat history
+        chatHistory.push({
+            sender: sender,
+            text: text
+        });
 
         // Scroll to bottom
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+        chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
+
+        // Save state
+        saveState();
     }
 
     function updateContextFiles(files) {
@@ -86,8 +107,6 @@
         } else {
             contextFilesList.innerHTML = '';
             const list = document.createElement('ul');
-            list.style.margin = '0';
-            list.style.paddingLeft = '20px';
 
             files.forEach(file => {
                 const item = document.createElement('li');
@@ -100,9 +119,54 @@
     }
 
     function clearChat() {
-        // Remove all messages except the welcome message
-        while (chatMessages.firstChild && !chatMessages.firstChild.classList.contains('welcome-message')) {
-            chatMessages.removeChild(chatMessages.firstChild);
+        // Remove all messages
+        chatHistoryElement.innerHTML = '';
+
+        // Add welcome message back
+        const welcomeMessage = document.createElement('div');
+        welcomeMessage.className = 'welcome-message';
+        welcomeMessage.innerHTML = `
+            <h2>Welcome to Codexpilot!</h2>
+            <p>Add files to the context using the command palette and start chatting.</p>
+        `;
+        chatHistoryElement.appendChild(welcomeMessage);
+
+        // Clear chat history
+        chatHistory = [];
+
+        // Save state
+        saveState();
+    }
+
+    // Initialize state persistence
+    function saveState() {
+        vscode.setState({
+            contextFiles: contextFiles,
+            chatHistory: chatHistory
+        });
+    }
+
+    function loadState() {
+        const state = vscode.getState();
+        if (state) {
+            // Restore context files
+            if (state.contextFiles && state.contextFiles.length > 0) {
+                updateContextFiles(state.contextFiles);
+            }
+
+            // Restore chat history
+            if (state.chatHistory && state.chatHistory.length > 0) {
+                // Clear welcome message
+                chatHistoryElement.innerHTML = '';
+
+                // Add each message
+                state.chatHistory.forEach(msg => {
+                    addChatMessage(msg.sender, msg.text);
+                });
+            }
         }
     }
+
+    // Load state when webview is initialized
+    loadState();
 })();

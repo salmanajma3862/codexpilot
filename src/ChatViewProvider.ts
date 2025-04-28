@@ -25,6 +25,32 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
         // Set the HTML content
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+
+        // Handle messages from the webview
+        webviewView.webview.onDidReceiveMessage(message => {
+            console.log('Received message from webview:', message);
+
+            switch (message.type) {
+                case 'sendMessage':
+                    console.log('User message:', message.text);
+                    // Here we would normally call an AI service
+                    // For now, just echo the message back
+                    this.sendMessageToWebview({
+                        type: 'assistantResponse',
+                        text: 'Echo: ' + message.text
+                    });
+                    break;
+            }
+        });
+    }
+
+    /**
+     * Send a message to the webview
+     */
+    private sendMessageToWebview(message: any) {
+        if (this._view) {
+            this._view.webview.postMessage(message);
+        }
     }
 
     private _getHtmlForWebview(webview: vscode.Webview): string {
@@ -45,7 +71,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             <link rel="stylesheet" type="text/css" href="${styleUri}">
         </head>
         <body>
-            <div id="app">
+            <div id="webview-container">
                 <div id="context-files">
                     <h3>Context Files</h3>
                     <div id="context-files-list">
@@ -53,18 +79,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                         <p>No files added to context yet.</p>
                     </div>
                 </div>
-                <div id="chat-container">
-                    <div id="chat-messages">
-                        <!-- Chat messages will appear here -->
-                        <div class="welcome-message">
-                            <h2>Welcome to Codexpilot!</h2>
-                            <p>Add files to the context using the command palette and start chatting.</p>
-                        </div>
+                <div id="chat-history">
+                    <!-- Chat messages will appear here -->
+                    <div class="welcome-message">
+                        <h2>Welcome to Codexpilot!</h2>
+                        <p>Add files to the context using the command palette and start chatting.</p>
                     </div>
-                    <div id="input-container">
-                        <textarea id="message-input" placeholder="Type your message here..."></textarea>
-                        <button id="send-button">Send</button>
-                    </div>
+                </div>
+                <div id="input-area">
+                    <textarea id="user-input" placeholder="Ask Codexpilot..."></textarea>
+                    <button id="send-button">Send</button>
                 </div>
             </div>
             <script nonce="${nonce}" src="${scriptUri}"></script>

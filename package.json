@@ -20,6 +20,11 @@
       {
         "command": "codexpilot.helloWorld",
         "title": "Hello World"
+      },
+      {
+        "command": "codexpilot.setApiKey",
+        "title": "Codexpilot: Set Gemini API Key",
+        "category": "Codexpilot"
       }
     ],
     "viewsContainers": {
