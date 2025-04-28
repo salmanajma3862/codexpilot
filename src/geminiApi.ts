@@ -1,8 +1,53 @@
 import * as vscode from 'vscode';
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold, GenerativeModel } from '@google/generative-ai';
 
 // Define the model name
 const MODEL_NAME = "gemini-1.5-pro-latest";
+
+/**
+ * Get a configured Gemini model instance
+ * @param apiKey The Gemini API key
+ * @returns A configured GenerativeModel instance
+ */
+function getGeminiModel(apiKey: string): GenerativeModel {
+    if (!apiKey) {
+        throw new Error('API key is required. Please set your Gemini API key using the "Codexpilot: Set Gemini API Key" command.');
+    }
+
+    console.log("Initializing Gemini API client...");
+
+    // Initialize the API client
+    const genAI = new GoogleGenerativeAI(apiKey);
+
+    // Get the generative model
+    return genAI.getGenerativeModel({
+        model: MODEL_NAME,
+        generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 8192,
+        },
+        safetySettings: [
+            {
+                category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+            {
+                category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+            {
+                category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+            {
+                category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            },
+        ],
+    });
+}
 
 /**
  * Call the Gemini API with the given prompt
@@ -11,44 +56,8 @@ const MODEL_NAME = "gemini-1.5-pro-latest";
  * @returns A promise that resolves to the response text
  */
 export async function callGeminiApi(apiKey: string, prompt: string): Promise<string> {
-    if (!apiKey) {
-        throw new Error('API key is required. Please set your Gemini API key using the "Codexpilot: Set Gemini API Key" command.');
-    }
-
     try {
-        console.log("Initializing Gemini API client...");
-
-        // Initialize the API client
-        const genAI = new GoogleGenerativeAI(apiKey);
-
-        // Get the generative model
-        const model = genAI.getGenerativeModel({
-            model: MODEL_NAME,
-            generationConfig: {
-                temperature: 0.7,
-                topK: 40,
-                topP: 0.95,
-                maxOutputTokens: 8192,
-            },
-            safetySettings: [
-                {
-                    category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                },
-                {
-                    category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                    threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-                },
-            ],
-        });
+        const model = getGeminiModel(apiKey);
 
         console.log("Calling Gemini API...");
 
@@ -72,28 +81,82 @@ export async function callGeminiApi(apiKey: string, prompt: string): Promise<str
 
         return responseText;
     } catch (error: any) {
-        console.error("Gemini API Error:", error);
+        handleGeminiError(error);
+    }
+}
 
-        // Check if the error is related to an invalid API key
-        if (error.message && (
-            error.message.includes('API key') ||
-            error.message.includes('authentication') ||
-            error.message.includes('401') ||
-            error.message.includes('403')
-        )) {
-            vscode.window.showErrorMessage(
-                'Invalid Gemini API key. Please set a valid API key using the "Codexpilot: Set Gemini API Key" command.',
-                'Set API Key'
-            ).then(selection => {
-                if (selection === 'Set API Key') {
-                    vscode.commands.executeCommand('codexpilot.setApiKey');
-                }
-            });
+/**
+ * Call the Gemini API with streaming response
+ * @param apiKey The Gemini API key
+ * @param prompt The prompt to send to the API
+ * @param onChunk Callback function to handle each chunk of the response
+ * @returns A promise that resolves when the stream is complete
+ */
+export async function callGeminiApiStream(
+    apiKey: string,
+    prompt: string,
+    onChunk: (chunk: string) => void
+): Promise<void> {
+    try {
+        const model = getGeminiModel(apiKey);
 
-            throw new Error('Invalid Gemini API key. Please set a valid API key.');
+        console.log("Calling Gemini API with streaming...");
+
+        // Generate content stream
+        const result = await model.generateContentStream(prompt);
+
+        // Process the stream
+        let fullResponse = '';
+
+        for await (const chunk of result.stream) {
+            const chunkText = chunk.text();
+            fullResponse += chunkText;
+
+            // Call the callback with the chunk text
+            onChunk(chunkText);
         }
 
-        // Re-throw with a more informative message
-        throw new Error(`Gemini API Error: ${error.message}`);
+        // The response object is available after the stream completes
+        const response = await result.response;
+
+        // Check if the response was blocked
+        if (response.promptFeedback?.blockReason) {
+            throw new Error(`Gemini response blocked. Reason: ${response.promptFeedback.blockReason}`);
+        }
+
+        console.log("Gemini API streaming completed successfully.");
+
+    } catch (error: any) {
+        handleGeminiError(error);
     }
+}
+
+/**
+ * Handle errors from the Gemini API
+ * @param error The error to handle
+ */
+function handleGeminiError(error: any): never {
+    console.error("Gemini API Error:", error);
+
+    // Check if the error is related to an invalid API key
+    if (error.message && (
+        error.message.includes('API key') ||
+        error.message.includes('authentication') ||
+        error.message.includes('401') ||
+        error.message.includes('403')
+    )) {
+        vscode.window.showErrorMessage(
+            'Invalid Gemini API key. Please set a valid API key using the "Codexpilot: Set Gemini API Key" command.',
+            'Set API Key'
+        ).then(selection => {
+            if (selection === 'Set API Key') {
+                vscode.commands.executeCommand('codexpilot.setApiKey');
+            }
+        });
+
+        throw new Error('Invalid Gemini API key. Please set a valid API key.');
+    }
+
+    // Re-throw with a more informative message
+    throw new Error(`Gemini API Error: ${error.message}`);
 }

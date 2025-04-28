@@ -81,6 +81,36 @@ export function clearContext() {
 }
 
 /**
+ * Remove a file from the context
+ * @param fileUri The URI of the file to remove
+ * @returns A promise that resolves to true if the file was removed, false otherwise
+ */
+export async function removeFileFromContext(fileUri: vscode.Uri): Promise<boolean> {
+    try {
+        // Check if the file is in the context
+        const fileUriString = fileUri.toString();
+        const index = contextFileUris.findIndex(uri => uri.toString() === fileUriString);
+
+        if (index === -1) {
+            console.log(`File ${fileUri.fsPath} is not in the context`);
+            return false;
+        }
+
+        // Remove the file from the context
+        contextFileUris.splice(index, 1);
+        console.log(`Removed file ${fileUri.fsPath} from the context`);
+
+        // Update the context in the webview
+        updateContextInWebview();
+
+        return true;
+    } catch (error) {
+        console.error(`Error removing file ${fileUri.fsPath} from the context:`, error);
+        return false;
+    }
+}
+
+/**
  * Search for files in the workspace
  * @param query The search query
  * @param maxResults The maximum number of results to return

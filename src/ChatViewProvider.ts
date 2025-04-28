@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { callGeminiApi } from './geminiApi';
+import { callGeminiApi, callGeminiApiStream } from './geminiApi';
 import { getApiKey, getContextFileUris } from './extension';
 
 // Interface for context management functions
@@ -69,6 +69,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 case 'insertCode':
                     console.log('Received insertCode request with code length:', message.code.length);
                     await this.handleInsertCode(message.code);
+                    break;
+
+                case 'removeFileFromContext':
+                    console.log('Received removeFileFromContext request with URI:', message.uriString);
+                    await this.handleRemoveFileFromContext(message.uriString);
                     break;
 
                 default:
@@ -144,6 +149,39 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 success: false,
                 error: 'Error adding file to context'
             });
+        }
+    }
+
+    /**
+     * Handle removing a file from the context
+     */
+    private async handleRemoveFileFromContext(uriString: string) {
+        try {
+            // Convert the URI string back to a URI
+            const uri = vscode.Uri.parse(uriString);
+
+            // Get the current context URIs from extension.ts
+            const currentUris = getContextFileUris();
+
+            // Find the URI to remove
+            const uriToRemove = currentUris.find(u => u.toString() === uriString);
+
+            if (uriToRemove) {
+                // Import the removeFileFromContext function from extension.ts
+                const { removeFileFromContext } = require('./extension');
+
+                // Remove the file from the context
+                await removeFileFromContext(uriToRemove);
+
+                // Update our local copy of the context URIs
+                this._currentContextUris = getContextFileUris();
+
+                console.log('File removed from context:', vscode.workspace.asRelativePath(uri));
+            } else {
+                console.log('URI not found in context:', uriString);
+            }
+        } catch (error) {
+            console.error('Error removing file from context:', error);
         }
     }
 
@@ -232,14 +270,25 @@ ${userQuery}`;
             // Send a thinking indicator
             this.sendMessageToWebview({ type: 'geminiThinking' });
 
-            // Call the Gemini API
-            const responseText = await callGeminiApi(apiKey, fullPrompt);
+            // Send a message to prepare the UI for streaming
+            this.sendMessageToWebview({ type: 'geminiStreamStart' });
 
-            // Send the response
-            this.sendMessageToWebview({
-                type: 'geminiResponse',
-                text: responseText
-            });
+            // Call the Gemini API with streaming
+            await callGeminiApiStream(
+                apiKey,
+                fullPrompt,
+                (chunk) => {
+                    // Send each chunk to the webview
+                    this.sendMessageToWebview({
+                        type: 'geminiResponseChunk',
+                        chunk: chunk
+                    });
+                }
+            );
+
+            // Send a message to indicate the stream has ended
+            this.sendMessageToWebview({ type: 'geminiStreamEnd' });
+
         } catch (error: any) {
             console.error('Error handling user query:', error);
 
@@ -248,6 +297,9 @@ ${userQuery}`;
                 type: 'geminiError',
                 text: error.message || 'An unknown error occurred'
             });
+
+            // Also send stream end to clean up UI state if needed
+            this.sendMessageToWebview({ type: 'geminiStreamEnd' });
         } finally {
             // Reset the processing flag
             this._isProcessingMessage = false;
@@ -317,22 +369,20 @@ ${userQuery}`;
         </head>
         <body>
             <div id="webview-container">
-                <div id="context-files">
-                    <h3>Context Files</h3>
-                    <div id="context-files-list">
-                        <!-- Context files will be listed here -->
-                        <p>No files added to context yet.</p>
-                    </div>
-                </div>
                 <div id="chat-history">
                     <!-- Chat messages will appear here -->
                     <div class="welcome-message">
                         <h2>Welcome to Codexpilot!</h2>
-                        <p>Add files to the context using the command palette and start chatting.</p>
+                        <p>Add files to the context by typing @ followed by a filename (e.g., @main.js).</p>
                     </div>
                 </div>
                 <div id="input-area">
-                    <textarea id="user-input" placeholder="Ask Codexpilot..."></textarea>
+                    <div id="input-container">
+                        <div id="context-pills">
+                            <!-- Context file pills will be added here dynamically -->
+                        </div>
+                        <textarea id="user-input" placeholder="Ask Codexpilot... (Use @ to add files to context)"></textarea>
+                    </div>
                     <button id="send-button">Send</button>
                 </div>
             </div>
