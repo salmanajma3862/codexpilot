@@ -9,7 +9,9 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onView:codexpilotChatView"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -17,7 +19,26 @@
         "command": "codexpilot.helloWorld",
         "title": "Hello World"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "codexpilotViewContainer",
+          "title": "Codexpilot",
+          "icon": "$(rocket)"
+        }
+      ]
+    },
+    "views": {
+      "codexpilotViewContainer": [
+        {
+          "type": "webview",
+          "id": "codexpilotChatView",
+          "name": "Chat",
+          "contextualTitle": "Codexpilot Chat"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
