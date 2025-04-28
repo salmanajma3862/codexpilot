@@ -274,9 +274,10 @@ ${userQuery}`;
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} https://cdnjs.cloudflare.com 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com;">
             <title>Codexpilot Chat</title>
             <link rel="stylesheet" type="text/css" href="${styleUri}">
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/vs2015.min.css">
         </head>
         <body>
             <div id="webview-container">
@@ -299,6 +300,36 @@ ${userQuery}`;
                     <button id="send-button">Send</button>
                 </div>
             </div>
+            <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/markdown-it/13.0.1/markdown-it.min.js"></script>
+            <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+            <!-- Add common language support -->
+            <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/javascript.min.js"></script>
+            <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/typescript.min.js"></script>
+            <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/python.min.js"></script>
+            <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/java.min.js"></script>
+            <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/csharp.min.js"></script>
+            <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/xml.min.js"></script>
+            <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/css.min.js"></script>
+            <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/json.min.js"></script>
+            <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/languages/bash.min.js"></script>
+            <script nonce="${nonce}">
+                // Initialize highlight.js
+                hljs.configure({
+                    languages: ['javascript', 'typescript', 'python', 'java', 'c', 'cpp', 'csharp', 'html', 'css', 'xml', 'json', 'markdown', 'bash']
+                });
+
+                // Log to confirm libraries are loaded
+                console.log('markdown-it loaded:', typeof window.markdownit === 'function');
+                console.log('highlight.js loaded:', typeof window.hljs === 'object');
+
+                // Register a global function to manually highlight all code blocks
+                window.highlightAllCodeBlocks = function() {
+                    console.log('Manually highlighting all code blocks');
+                    document.querySelectorAll('pre code').forEach(block => {
+                        hljs.highlightElement(block);
+                    });
+                };
+            </script>
             <script nonce="${nonce}" src="${scriptUri}"></script>
         </body>
         </html>`;

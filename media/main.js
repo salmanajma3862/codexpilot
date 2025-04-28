@@ -368,7 +368,67 @@
 
         const textElement = document.createElement('div');
         textElement.className = 'message-text';
-        textElement.textContent = text;
+
+        // If this is an assistant message, render it as markdown
+        if (sender === 'assistant') {
+            try {
+                console.log('Rendering markdown for assistant message');
+
+                // Initialize markdown-it with syntax highlighting
+                const md = window.markdownit({
+                    html: false, // Don't allow HTML tags in source for security
+                    linkify: true, // Autoconvert URL-like text to links
+                    typographer: true, // Enable smartquotes, dashes, etc.
+                    highlight: function (str, lang) {
+                        console.log('Highlighting code block with language:', lang);
+
+                        if (lang && window.hljs.getLanguage(lang)) {
+                            try {
+                                // Properly wrap the highlighted code in pre and code tags
+                                return '<pre class="hljs"><code class="language-' + lang + '">' +
+                                       window.hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
+                                       '</code></pre>';
+                            } catch (error) {
+                                console.error('Error highlighting code:', error);
+                            }
+                        }
+
+                        // Use default escaping if no language or highlight fails
+                        return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>';
+                    }
+                });
+
+                // Render the markdown
+                const renderedHtml = md.render(text);
+                console.log('Rendered HTML:', renderedHtml);
+
+                // Set the innerHTML
+                textElement.innerHTML = renderedHtml;
+
+                // Add a class to the message element for styling
+                messageElement.classList.add('markdown-message');
+
+                // Apply highlighting to any code blocks that might have been missed
+                setTimeout(() => {
+                    const codeBlocks = textElement.querySelectorAll('pre code');
+                    console.log('Found', codeBlocks.length, 'code blocks for manual highlighting');
+
+                    codeBlocks.forEach(block => {
+                        try {
+                            window.hljs.highlightElement(block);
+                        } catch (error) {
+                            console.error('Error manually highlighting code block:', error);
+                        }
+                    });
+                }, 0);
+            } catch (error) {
+                console.error('Error rendering markdown:', error);
+                textElement.textContent = text; // Fallback to plain text
+            }
+        } else {
+            // For user messages, just use plain text
+            textElement.textContent = text;
+        }
 
         messageElement.appendChild(senderElement);
         messageElement.appendChild(textElement);
@@ -386,6 +446,11 @@
 
         // Save state
         saveState();
+
+        // Call the global highlight function after a short delay to ensure DOM is updated
+        if (sender === 'assistant' && typeof window.highlightAllCodeBlocks === 'function') {
+            setTimeout(window.highlightAllCodeBlocks, 100);
+        }
     }
 
     function updateContextFiles(files) {
@@ -484,7 +549,59 @@
 
         const textElement = document.createElement('div');
         textElement.className = 'message-text';
-        textElement.textContent = errorText;
+
+        // Format the error message as markdown if it contains code blocks
+        if (errorText.includes('```')) {
+            try {
+                const md = window.markdownit({
+                    html: false,
+                    linkify: true,
+                    typographer: true,
+                    highlight: function (str, lang) {
+                        console.log('Highlighting error code block with language:', lang);
+
+                        if (lang && window.hljs.getLanguage(lang)) {
+                            try {
+                                // Properly wrap the highlighted code in pre and code tags
+                                return '<pre class="hljs"><code class="language-' + lang + '">' +
+                                       window.hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
+                                       '</code></pre>';
+                            } catch (error) {
+                                console.error('Error highlighting code in error message:', error);
+                            }
+                        }
+
+                        // Use default escaping if no language or highlight fails
+                        return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>';
+                    }
+                });
+
+                const renderedHtml = md.render(errorText);
+                console.log('Rendered error HTML:', renderedHtml);
+
+                textElement.innerHTML = renderedHtml;
+                errorElement.classList.add('markdown-message');
+
+                // Apply highlighting to any code blocks that might have been missed
+                setTimeout(() => {
+                    const codeBlocks = textElement.querySelectorAll('pre code');
+                    console.log('Found', codeBlocks.length, 'code blocks for manual highlighting in error');
+
+                    codeBlocks.forEach(block => {
+                        try {
+                            window.hljs.highlightElement(block);
+                        } catch (error) {
+                            console.error('Error manually highlighting code block in error:', error);
+                        }
+                    });
+                }, 0);
+            } catch (error) {
+                console.error('Error rendering markdown in error message:', error);
+                textElement.textContent = errorText;
+            }
+        } else {
+            textElement.textContent = errorText;
+        }
 
         errorElement.appendChild(senderElement);
         errorElement.appendChild(textElement);
@@ -496,6 +613,11 @@
 
         // Save state
         saveState();
+
+        // Call the global highlight function after a short delay to ensure DOM is updated
+        if (errorText.includes('```') && typeof window.highlightAllCodeBlocks === 'function') {
+            setTimeout(window.highlightAllCodeBlocks, 100);
+        }
     }
 
     // Initialize state persistence

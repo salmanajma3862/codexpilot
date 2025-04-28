@@ -236,3 +236,136 @@ body {
     color: var(--vscode-editor-background);
     font-weight: bold;
 }
+
+/* Markdown Message Styles */
+.markdown-message .message-text {
+    line-height: 1.5;
+}
+
+/* Paragraph spacing */
+.markdown-message .message-text p {
+    margin-bottom: 10px;
+}
+
+/* Headings */
+.markdown-message .message-text h1,
+.markdown-message .message-text h2,
+.markdown-message .message-text h3,
+.markdown-message .message-text h4,
+.markdown-message .message-text h5,
+.markdown-message .message-text h6 {
+    margin-top: 16px;
+    margin-bottom: 8px;
+    font-weight: 600;
+    line-height: 1.25;
+}
+
+.markdown-message .message-text h1 {
+    font-size: 1.5em;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    padding-bottom: 0.3em;
+}
+
+.markdown-message .message-text h2 {
+    font-size: 1.3em;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    padding-bottom: 0.3em;
+}
+
+.markdown-message .message-text h3 {
+    font-size: 1.2em;
+}
+
+.markdown-message .message-text h4 {
+    font-size: 1.1em;
+}
+
+/* Lists */
+.markdown-message .message-text ul,
+.markdown-message .message-text ol {
+    padding-left: 2em;
+    margin-bottom: 16px;
+}
+
+.markdown-message .message-text li {
+    margin-bottom: 4px;
+}
+
+/* Links */
+.markdown-message .message-text a {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: none;
+}
+
+.markdown-message .message-text a:hover {
+    text-decoration: underline;
+}
+
+/* Blockquotes */
+.markdown-message .message-text blockquote {
+    padding: 0 1em;
+    color: var(--vscode-descriptionForeground);
+    border-left: 0.25em solid var(--vscode-panel-border);
+    margin-bottom: 16px;
+}
+
+/* Code blocks */
+.markdown-message .message-text pre {
+    background-color: var(--vscode-editor-background);
+    border-radius: 3px;
+    padding: 16px;
+    overflow: auto;
+    margin-bottom: 16px;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.9em;
+    position: relative;
+}
+
+.markdown-message .message-text pre code {
+    background: transparent !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 1em;
+    display: block;
+    overflow-x: auto;
+}
+
+/* Ensure highlight.js styles take precedence */
+.hljs {
+    display: block;
+    overflow-x: auto;
+    padding: 0;
+    background: var(--vscode-editor-background) !important;
+}
+
+/* Inline code */
+.markdown-message .message-text code:not(pre code) {
+    background-color: var(--vscode-editor-background);
+    border-radius: 3px;
+    padding: 0.2em 0.4em;
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 0.9em;
+}
+
+/* Tables */
+.markdown-message .message-text table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.markdown-message .message-text table th,
+.markdown-message .message-text table td {
+    border: 1px solid var(--vscode-panel-border);
+    padding: 6px 13px;
+}
+
+.markdown-message .message-text table th {
+    background-color: var(--vscode-editor-background);
+    font-weight: 600;
+}
+
+.markdown-message .message-text table tr:nth-child(2n) {
+    background-color: var(--vscode-editor-background);
+}
