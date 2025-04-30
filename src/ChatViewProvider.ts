@@ -393,8 +393,13 @@ ${userQuery}`;
                     -webkit-user-select: none;
                 }
 
-                /* Codicon: send */
+                /* Codicon icons */
                 .codicon-send:before { content: '\\ea77'; }
+                .codicon-copy:before { content: '\\eb03'; }
+                .codicon-insert:before { content: '\\ea7a'; }
+                .codicon-check:before { content: '\\eab2'; }
+                .codicon-error:before { content: '\\ea87'; }
+                .codicon-loading:before { content: '\\eb19'; }
 
                 /* Fallback if codicon font is not available */
                 @font-face {
@@ -402,10 +407,13 @@ ${userQuery}`;
                     src: url('${webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'codicon.ttf'))}');
                 }
 
-                /* Fallback content for send icon */
-                .codicon-send:not(:before) {
-                    content: '→';
-                }
+                /* Fallback content for icons */
+                .codicon-send:not(:before) { content: '→'; }
+                .codicon-copy:not(:before) { content: 'C'; }
+                .codicon-insert:not(:before) { content: 'I'; }
+                .codicon-check:not(:before) { content: '✓'; }
+                .codicon-error:not(:before) { content: '!'; }
+                .codicon-loading:not(:before) { content: '⟳'; }
             </style>
         </head>
         <body>
@@ -418,6 +426,10 @@ ${userQuery}`;
                     </div>
                 </div>
                 <div id="input-area">
+                    <div id="mode-selector">
+                        <button class="mode-button active" data-mode="chat" title="Standard Chat Mode">Chat</button>
+                        <button class="mode-button" data-mode="agent" title="Agent Mode (Coming Soon!)">Agent <span>Soon</span></button>
+                    </div>
                     <div id="input-wrapper">
                         <div id="context-pills">
                             <!-- Context file pills will be added here dynamically -->

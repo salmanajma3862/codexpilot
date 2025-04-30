@@ -9,7 +9,7 @@
     const userInputElement = document.getElementById('user-input');
     const sendButtonElement = document.getElementById('send-button');
     const contextPillsElement = document.getElementById('context-pills');
-    const inputContainerElement = document.getElementById('input-container');
+    const modeButtonElements = document.querySelectorAll('.mode-button');
 
     // Create file search results container
     const fileSearchContainer = document.createElement('div');
@@ -25,6 +25,7 @@
     let currentSearchQuery = '';
     let currentAssistantMessageElement = null;
     let accumulatedResponseText = '';
+    let currentMode = 'chat'; // Default mode
 
     // Animation state for smooth character-by-character display
     let characterQueue = []; // Stores characters to be displayed
@@ -55,6 +56,31 @@
     // Add input event listeners
     userInputElement.addEventListener('input', handleInputChange);
     userInputElement.addEventListener('input', autoResizeTextarea);
+
+    // Add mode button event listeners
+    modeButtonElements.forEach(button => {
+        button.addEventListener('click', () => {
+            // Get the mode from the button's data attribute
+            const mode = button.dataset.mode;
+
+            // Update the current mode
+            currentMode = mode;
+
+            // Remove active class from all buttons
+            modeButtonElements.forEach(btn => btn.classList.remove('active'));
+
+            // Add active class to the clicked button
+            button.classList.add('active');
+
+            // Handle mode-specific actions
+            if (mode === 'agent') {
+                // Show a temporary notification for agent mode
+                showTemporaryNotification('Agent mode coming soon!');
+            } else {
+                console.log('Chat mode selected');
+            }
+        });
+    });
 
     // Function to auto-resize the textarea based on content
     function autoResizeTextarea() {
@@ -155,8 +181,8 @@
         // Position the container below the input
         positionFileSearchContainer();
 
-        // Add a temporary border for debugging
-        fileSearchContainer.style.border = '2px solid blue';
+        // Ensure proper styling
+        fileSearchContainer.style.border = '1px solid var(--vscode-editorWidget-border, var(--vscode-input-border))';
 
         console.log('File search container:', {
             display: fileSearchContainer.style.display,
@@ -202,10 +228,8 @@
         fileSearchContainer.style.maxHeight = '200px';
         fileSearchContainer.style.overflowY = 'auto';
         fileSearchContainer.style.zIndex = '1000';
-        fileSearchContainer.style.backgroundColor = 'var(--vscode-editor-background)';
-        fileSearchContainer.style.border = '1px solid var(--vscode-input-border)';
+        fileSearchContainer.style.backgroundColor = 'var(--vscode-editorWidget-background, var(--vscode-editor-background))';
         fileSearchContainer.style.borderRadius = '6px';
-        fileSearchContainer.style.boxShadow = '0 -2px 8px rgba(0, 0, 0, 0.15)';
 
         // Ensure the container is visible
         fileSearchContainer.style.display = 'block';
@@ -228,8 +252,8 @@
             fileSearchContainer.style.display = 'block';
             positionFileSearchContainer();
 
-            // Add a temporary border for debugging
-            fileSearchContainer.style.border = '2px solid red';
+            // Ensure proper styling
+            fileSearchContainer.style.border = '1px solid var(--vscode-editorWidget-border, var(--vscode-input-border))';
 
             return;
         }
@@ -275,8 +299,8 @@
         fileSearchContainer.style.display = 'block';
         positionFileSearchContainer();
 
-        // Add a temporary border for debugging
-        fileSearchContainer.style.border = '2px solid green';
+        // Ensure proper styling
+        fileSearchContainer.style.border = '1px solid var(--vscode-editorWidget-border, var(--vscode-input-border))';
 
         console.log('Results list created and added to DOM');
     }
@@ -556,13 +580,13 @@
                                 // Create Copy button
                                 const copyButton = document.createElement('button');
                                 copyButton.className = 'code-button copy-button';
-                                copyButton.textContent = 'Copy';
+                                copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
                                 copyButton.title = 'Copy code to clipboard';
 
                                 // Create Insert button
                                 const insertButton = document.createElement('button');
                                 insertButton.className = 'code-button insert-button';
-                                insertButton.textContent = 'Insert';
+                                insertButton.innerHTML = '<i class="codicon codicon-insert"></i>';
                                 insertButton.title = 'Insert code at cursor position';
 
                                 // Add event listener for Copy button
@@ -571,22 +595,22 @@
                                     navigator.clipboard.writeText(codeText)
                                         .then(() => {
                                             // Show feedback
-                                            copyButton.textContent = 'Copied!';
+                                            copyButton.innerHTML = '<i class="codicon codicon-check"></i>';
                                             copyButton.classList.add('copied');
 
                                             // Reset after 2 seconds
                                             setTimeout(() => {
-                                                copyButton.textContent = 'Copy';
+                                                copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
                                                 copyButton.classList.remove('copied');
                                             }, 2000);
                                         })
                                         .catch(err => {
                                             console.error('Error copying text: ', err);
-                                            copyButton.textContent = 'Error!';
+                                            copyButton.innerHTML = '<i class="codicon codicon-error"></i>';
 
                                             // Reset after 2 seconds
                                             setTimeout(() => {
-                                                copyButton.textContent = 'Copy';
+                                                copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
                                             }, 2000);
                                         });
                                 });
@@ -931,13 +955,13 @@
                             // Create Copy button
                             const copyButton = document.createElement('button');
                             copyButton.className = 'code-button copy-button';
-                            copyButton.textContent = 'Copy';
+                            copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
                             copyButton.title = 'Copy code to clipboard';
 
                             // Create Insert button
                             const insertButton = document.createElement('button');
                             insertButton.className = 'code-button insert-button';
-                            insertButton.textContent = 'Insert';
+                            insertButton.innerHTML = '<i class="codicon codicon-insert"></i>';
                             insertButton.title = 'Insert code at cursor position';
 
                             // Add event listener for Copy button
@@ -946,22 +970,22 @@
                                 navigator.clipboard.writeText(codeText)
                                     .then(() => {
                                         // Show feedback
-                                        copyButton.textContent = 'Copied!';
+                                        copyButton.innerHTML = '<i class="codicon codicon-check"></i>';
                                         copyButton.classList.add('copied');
 
                                         // Reset after 2 seconds
                                         setTimeout(() => {
-                                            copyButton.textContent = 'Copy';
+                                            copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
                                             copyButton.classList.remove('copied');
                                         }, 2000);
                                     })
                                     .catch(err => {
                                         console.error('Error copying text: ', err);
-                                        copyButton.textContent = 'Error!';
+                                        copyButton.innerHTML = '<i class="codicon codicon-error"></i>';
 
                                         // Reset after 2 seconds
                                         setTimeout(() => {
-                                            copyButton.textContent = 'Copy';
+                                            copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
                                         }, 2000);
                                     });
                             });
@@ -975,11 +999,11 @@
                                 });
 
                                 // Show feedback
-                                insertButton.textContent = 'Inserting...';
+                                insertButton.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i>';
 
                                 // Reset after 2 seconds
                                 setTimeout(() => {
-                                    insertButton.textContent = 'Insert';
+                                    insertButton.innerHTML = '<i class="codicon codicon-insert"></i>';
                                 }, 2000);
                             });
 
@@ -1093,13 +1117,13 @@
                                 // Create Copy button
                                 const copyButton = document.createElement('button');
                                 copyButton.className = 'code-button copy-button';
-                                copyButton.textContent = 'Copy';
+                                copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
                                 copyButton.title = 'Copy code to clipboard';
 
                                 // Create Insert button
                                 const insertButton = document.createElement('button');
                                 insertButton.className = 'code-button insert-button';
-                                insertButton.textContent = 'Insert';
+                                insertButton.innerHTML = '<i class="codicon codicon-insert"></i>';
                                 insertButton.title = 'Insert code at cursor position';
 
                                 // Add event listener for Copy button
@@ -1108,22 +1132,22 @@
                                     navigator.clipboard.writeText(codeText)
                                         .then(() => {
                                             // Show feedback
-                                            copyButton.textContent = 'Copied!';
+                                            copyButton.innerHTML = '<i class="codicon codicon-check"></i>';
                                             copyButton.classList.add('copied');
 
                                             // Reset after 2 seconds
                                             setTimeout(() => {
-                                                copyButton.textContent = 'Copy';
+                                                copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
                                                 copyButton.classList.remove('copied');
                                             }, 2000);
                                         })
                                         .catch(err => {
                                             console.error('Error copying text: ', err);
-                                            copyButton.textContent = 'Error!';
+                                            copyButton.innerHTML = '<i class="codicon codicon-error"></i>';
 
                                             // Reset after 2 seconds
                                             setTimeout(() => {
-                                                copyButton.textContent = 'Copy';
+                                                copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
                                             }, 2000);
                                         });
                                 });
@@ -1137,11 +1161,11 @@
                                     });
 
                                     // Show feedback
-                                    insertButton.textContent = 'Inserting...';
+                                    insertButton.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i>';
 
                                     // Reset after 2 seconds
                                     setTimeout(() => {
-                                        insertButton.textContent = 'Insert';
+                                        insertButton.innerHTML = '<i class="codicon codicon-insert"></i>';
                                     }, 2000);
                                 });
 
@@ -1219,4 +1243,38 @@
 
     // Load state when webview is initialized
     loadState();
+
+    // Function to show a temporary notification in the webview
+    function showTemporaryNotification(message) {
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = 'temporary-notification';
+        notification.textContent = message;
+        notification.style.position = 'fixed';
+        notification.style.bottom = '60px';
+        notification.style.left = '50%';
+        notification.style.transform = 'translateX(-50%)';
+        notification.style.backgroundColor = 'var(--vscode-notificationToast-background, var(--vscode-editor-background))';
+        notification.style.color = 'var(--vscode-notificationToast-foreground, var(--vscode-editor-foreground))';
+        notification.style.padding = '8px 16px';
+        notification.style.borderRadius = '4px';
+        notification.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.15)';
+        notification.style.zIndex = '1000';
+        notification.style.fontSize = '12px';
+        notification.style.border = '1px solid var(--vscode-notificationToast-border, var(--vscode-panel-border))';
+
+        // Add to DOM
+        document.body.appendChild(notification);
+
+        // Remove after 3 seconds
+        setTimeout(() => {
+            notification.style.opacity = '0';
+            notification.style.transition = 'opacity 0.5s ease';
+
+            // Remove from DOM after fade out
+            setTimeout(() => {
+                notification.remove();
+            }, 500);
+        }, 3000);
+    }
 })();
