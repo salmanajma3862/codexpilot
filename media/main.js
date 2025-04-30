@@ -9,7 +9,9 @@
     const userInputElement = document.getElementById('user-input');
     const sendButtonElement = document.getElementById('send-button');
     const contextPillsElement = document.getElementById('context-pills');
-    const modeButtonElements = document.querySelectorAll('.mode-button');
+    const modePickerButton = document.getElementById('mode-picker-button');
+    const modeDropdown = document.getElementById('mode-dropdown');
+    const contextAddButton = document.getElementById('context-add-button');
 
     // Create file search results container
     const fileSearchContainer = document.createElement('div');
@@ -57,20 +59,33 @@
     userInputElement.addEventListener('input', handleInputChange);
     userInputElement.addEventListener('input', autoResizeTextarea);
 
-    // Add mode button event listeners
-    modeButtonElements.forEach(button => {
-        button.addEventListener('click', () => {
+    // Mode picker dropdown functionality
+    modePickerButton.addEventListener('click', (event) => {
+        // Toggle dropdown visibility
+        if (modeDropdown.style.display === 'block') {
+            modeDropdown.style.display = 'none';
+        } else {
+            modeDropdown.style.display = 'block';
+        }
+        event.stopPropagation(); // Prevent the click from being detected by the document
+    });
+
+    // Handle clicks on mode dropdown options
+    modeDropdown.addEventListener('click', (event) => {
+        // Find the closest button element (could be the button itself or a child of it)
+        const button = event.target.closest('button');
+        if (button) {
             // Get the mode from the button's data attribute
             const mode = button.dataset.mode;
 
             // Update the current mode
             currentMode = mode;
 
-            // Remove active class from all buttons
-            modeButtonElements.forEach(btn => btn.classList.remove('active'));
+            // Update the text in the mode picker button
+            document.getElementById('current-mode-text').textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
 
-            // Add active class to the clicked button
-            button.classList.add('active');
+            // Hide the dropdown
+            modeDropdown.style.display = 'none';
 
             // Handle mode-specific actions
             if (mode === 'agent') {
@@ -79,7 +94,34 @@
             } else {
                 console.log('Chat mode selected');
             }
-        });
+        }
+    });
+
+    // Context add button functionality
+    contextAddButton.addEventListener('click', () => {
+        // Insert @ symbol at current cursor position
+        const cursorPosition = userInputElement.selectionStart;
+        const text = userInputElement.value;
+        const newText = text.substring(0, cursorPosition) + '@' + text.substring(cursorPosition);
+        userInputElement.value = newText;
+
+        // Set cursor position after the @ symbol
+        userInputElement.setSelectionRange(cursorPosition + 1, cursorPosition + 1);
+
+        // Trigger input event to activate file search
+        userInputElement.dispatchEvent(new Event('input', { bubbles: true }));
+
+        // Focus the input
+        userInputElement.focus();
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (event) => {
+        if (modeDropdown.style.display === 'block' &&
+            !modePickerButton.contains(event.target) &&
+            !modeDropdown.contains(event.target)) {
+            modeDropdown.style.display = 'none';
+        }
     });
 
     // Function to auto-resize the textarea based on content
@@ -1173,7 +1215,7 @@
 
                                     // Reset after 2 seconds
                                     setTimeout(() => {
-                                        insertButton.innerHTML = '<i class="codicon codicon-insert"></i>';
+                                        insertButton.innerHTML = '<i class="codicon codicon-add"></i>';
                                     }, 2000);
                                 });
 

@@ -401,6 +401,10 @@ ${userQuery}`;
                 .codicon-check:before { content: '\\eab2'; }
                 .codicon-error:before { content: '\\ea87'; }
                 .codicon-loading:before { content: '\\eb19'; }
+                .codicon-comment-discussion:before { content: '\\ea90'; }
+                .codicon-chevron-down:before { content: '\\eab4'; }
+                .codicon-robot:before { content: '\\eb70'; }
+                .codicon-mention:before { content: '\\eba3'; }
 
                 /* Fallback if codicon font is not available */
                 @font-face {
@@ -416,6 +420,10 @@ ${userQuery}`;
                 .codicon-check:not(:before) { content: '✓'; }
                 .codicon-error:not(:before) { content: '!'; }
                 .codicon-loading:not(:before) { content: '⟳'; }
+                .codicon-comment-discussion:not(:before) { content: '💬'; }
+                .codicon-chevron-down:not(:before) { content: '▼'; }
+                .codicon-robot:not(:before) { content: '🤖'; }
+                .codicon-mention:not(:before) { content: '@'; }
             </style>
         </head>
         <body>
@@ -436,10 +444,25 @@ ${userQuery}`;
                         <button id="send-button" title="Send Message">
                             <i class="codicon codicon-send"></i>
                         </button>
-                        <div id="mode-selector">
-                            <button class="mode-button active" data-mode="chat" title="Standard Chat Mode">Chat</button>
-                            <button class="mode-button" data-mode="agent" title="Agent Mode (Coming Soon!)">Agent <span>Soon</span></button>
+
+                        <!-- Mode Picker Dropdown -->
+                        <div id="mode-picker-container">
+                            <button id="mode-picker-button" class="mode-button" title="Select Mode">
+                                <i class="codicon codicon-comment-discussion"></i>
+                                <span id="current-mode-text">Chat</span>
+                                <i class="codicon codicon-chevron-down"></i>
+                            </button>
+                            <!-- Dropdown menu - initially hidden -->
+                            <ul id="mode-dropdown" class="mode-dropdown">
+                                <li><button data-mode="chat"><i class="codicon codicon-comment-discussion"></i> Chat</button></li>
+                                <li><button data-mode="agent" title="Coming Soon!"><i class="codicon codicon-robot"></i> Agent <span class="soon-tag">Soon</span></button></li>
+                            </ul>
                         </div>
+
+                        <!-- Context Add Button -->
+                        <button id="context-add-button" class="icon-button" title="Add Context File (@)">
+                            <i class="codicon codicon-mention"></i>
+                        </button>
                     </div>
                 </div>
             </div>
