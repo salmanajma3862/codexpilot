@@ -23,6 +23,8 @@ body {
     height: 100vh;
     overflow: hidden;
     background-color: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-sideBar-border);
+    box-sizing: border-box;
 }
 
 /* Chat History Section */
@@ -135,7 +137,7 @@ body {
     display: flex;
     flex-direction: column;
     padding: 10px 14px;
-    border-top: 1px solid var(--vscode-sideBar-border, var(--vscode-panel-border));
+    /* Removed border-top as requested */
     background-color: var(--vscode-editor-background);
     position: relative;
     z-index: 10;
@@ -145,8 +147,10 @@ body {
 #mode-selector {
     display: flex;
     gap: 8px;
-    margin-bottom: 8px;
-    padding-left: 5px;
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    z-index: 20;
 }
 
 .mode-button {

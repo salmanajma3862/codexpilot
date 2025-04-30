@@ -119,9 +119,9 @@
         // Find the @ symbol before the cursor
         const textBeforeCursor = text.substring(0, cursorPosition);
 
-        // Use regex to find the last @ followed by word characters up to the cursor
-        // This will match @word but not @word followed by a space
-        const atMatch = textBeforeCursor.match(/@(\S*)$/);
+        // Use regex to find the last @ followed by any non-whitespace characters up to the cursor
+        // This will match @word, @word.ext, @path/file, etc. but not @word followed by a space
+        const atMatch = textBeforeCursor.match(/@([^\s]*)$/);
 
         console.log('Input change detected:', {
             text,
@@ -157,6 +157,14 @@
     // Function to search for files
     function searchFiles(query) {
         console.log('Searching files with query:', query);
+
+        // Log special characters if present to help with debugging
+        if (query.includes('.') || query.includes('/') || query.includes('\\')) {
+            console.log('Query contains special characters:',
+                        query.includes('.') ? 'dot' : '',
+                        query.includes('/') ? 'forward-slash' : '',
+                        query.includes('\\') ? 'backslash' : '');
+        }
 
         // Show loading indicator
         showFileSearchLoading();
@@ -586,7 +594,7 @@
                                 // Create Insert button
                                 const insertButton = document.createElement('button');
                                 insertButton.className = 'code-button insert-button';
-                                insertButton.innerHTML = '<i class="codicon codicon-insert"></i>';
+                                insertButton.innerHTML = '<i class="codicon codicon-add"></i>';
                                 insertButton.title = 'Insert code at cursor position';
 
                                 // Add event listener for Copy button
@@ -624,11 +632,11 @@
                                     });
 
                                     // Show feedback
-                                    insertButton.textContent = 'Inserting...';
+                                    insertButton.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i>';
 
                                     // Reset after 2 seconds
                                     setTimeout(() => {
-                                        insertButton.textContent = 'Insert';
+                                        insertButton.innerHTML = '<i class="codicon codicon-add"></i>';
                                     }, 2000);
                                 });
 
@@ -961,7 +969,7 @@
                             // Create Insert button
                             const insertButton = document.createElement('button');
                             insertButton.className = 'code-button insert-button';
-                            insertButton.innerHTML = '<i class="codicon codicon-insert"></i>';
+                            insertButton.innerHTML = '<i class="codicon codicon-add"></i>';
                             insertButton.title = 'Insert code at cursor position';
 
                             // Add event listener for Copy button
@@ -1003,7 +1011,7 @@
 
                                 // Reset after 2 seconds
                                 setTimeout(() => {
-                                    insertButton.innerHTML = '<i class="codicon codicon-insert"></i>';
+                                    insertButton.innerHTML = '<i class="codicon codicon-add"></i>';
                                 }, 2000);
                             });
 

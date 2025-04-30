@@ -397,6 +397,7 @@ ${userQuery}`;
                 .codicon-send:before { content: '\\ea77'; }
                 .codicon-copy:before { content: '\\eb03'; }
                 .codicon-insert:before { content: '\\ea7a'; }
+                .codicon-add:before { content: '\\ea60'; }
                 .codicon-check:before { content: '\\eab2'; }
                 .codicon-error:before { content: '\\ea87'; }
                 .codicon-loading:before { content: '\\eb19'; }
@@ -411,6 +412,7 @@ ${userQuery}`;
                 .codicon-send:not(:before) { content: '→'; }
                 .codicon-copy:not(:before) { content: 'C'; }
                 .codicon-insert:not(:before) { content: 'I'; }
+                .codicon-add:not(:before) { content: '+'; }
                 .codicon-check:not(:before) { content: '✓'; }
                 .codicon-error:not(:before) { content: '!'; }
                 .codicon-loading:not(:before) { content: '⟳'; }
@@ -426,10 +428,6 @@ ${userQuery}`;
                     </div>
                 </div>
                 <div id="input-area">
-                    <div id="mode-selector">
-                        <button class="mode-button active" data-mode="chat" title="Standard Chat Mode">Chat</button>
-                        <button class="mode-button" data-mode="agent" title="Agent Mode (Coming Soon!)">Agent <span>Soon</span></button>
-                    </div>
                     <div id="input-wrapper">
                         <div id="context-pills">
                             <!-- Context file pills will be added here dynamically -->
@@ -438,6 +436,10 @@ ${userQuery}`;
                         <button id="send-button" title="Send Message">
                             <i class="codicon codicon-send"></i>
                         </button>
+                        <div id="mode-selector">
+                            <button class="mode-button active" data-mode="chat" title="Standard Chat Mode">Chat</button>
+                            <button class="mode-button" data-mode="agent" title="Agent Mode (Coming Soon!)">Agent <span>Soon</span></button>
+                        </div>
                     </div>
                 </div>
             </div>

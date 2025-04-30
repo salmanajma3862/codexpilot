@@ -119,28 +119,61 @@ export async function removeFileFromContext(fileUri: vscode.Uri): Promise<boolea
 export async function searchWorkspaceFiles(query: string, maxResults: number = 10): Promise<vscode.Uri[]> {
     console.log('searchWorkspaceFiles called with query:', query, 'maxResults:', maxResults);
 
-    // Create a glob pattern that includes the query
-    // Using a more inclusive pattern to match files containing the query in their path
-    const searchPattern = `**/*${query}*.*`;
-
-    console.log('Search pattern:', searchPattern);
-    console.log('Exclude pattern:', '**/node_modules/**');
-
     try {
-        // Search for files matching the pattern
+        // Use a broad glob pattern to get all files
+        // We'll filter them case-insensitively afterwards
+        const searchPattern = `**/*.*`;
+
+        console.log('Search pattern:', searchPattern);
+        console.log('Exclude pattern:', '**/node_modules/**');
+
+        // Search for all files
         console.log('Calling vscode.workspace.findFiles...');
-        const files = await vscode.workspace.findFiles(
+        const allFiles = await vscode.workspace.findFiles(
             searchPattern,
             '**/node_modules/**', // Exclude node_modules
-            maxResults
+            1000 // Get more files than we need to ensure we have enough after filtering
         );
 
-        console.log('Files found:', files.length);
-        if (files.length > 0) {
-            console.log('First few files:', files.slice(0, 5).map(uri => uri.toString()));
+        // Filter files case-insensitively
+        const queryLower = query.toLowerCase();
+        console.log('Filtering files with lowercase query:', queryLower);
+
+        // Log if query contains special characters
+        if (query.includes('.') || query.includes('/') || query.includes('\\')) {
+            console.log('Query contains special characters:',
+                        query.includes('.') ? 'dot' : '',
+                        query.includes('/') ? 'forward-slash' : '',
+                        query.includes('\\') ? 'backslash' : '');
         }
 
-        return files;
+        const filteredFiles = allFiles.filter(uri => {
+            // Get just the filename part (not the full path)
+            const fileName = uri.path.split('/').pop() || '';
+            // Also get the full path for broader matching
+            const fullPath = vscode.workspace.asRelativePath(uri);
+
+            const fileNameLower = fileName.toLowerCase();
+            const fullPathLower = fullPath.toLowerCase();
+
+            // Check if the filename or path contains the query (case-insensitive)
+            const matchesFileName = fileNameLower.includes(queryLower);
+            const matchesPath = fullPathLower.includes(queryLower);
+
+            // Log some sample matches for debugging
+            if ((matchesFileName || matchesPath) && Math.random() < 0.1) { // Only log ~10% of matches to avoid console spam
+                console.log(`Match found: "${fullPath}" (matches filename: ${matchesFileName}, matches path: ${matchesPath})`);
+            }
+
+            return matchesFileName || matchesPath;
+        }).slice(0, maxResults); // Limit to requested number of results
+
+        console.log('Files found after filtering:', filteredFiles.length);
+        if (filteredFiles.length > 0) {
+            console.log('First few files:', filteredFiles.slice(0, 5).map(uri => uri.toString()));
+        }
+
+        return filteredFiles;
     } catch (error) {
         console.error('Error searching workspace files:', error);
         return [];
