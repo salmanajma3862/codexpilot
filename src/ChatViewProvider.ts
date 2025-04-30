@@ -367,63 +367,45 @@ ${userQuery}`;
         const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.css'));
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.js'));
 
+        // Create URI for the VS Code Codicons CSS
+        const codiconsUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode/codicons', 'dist', 'codicon.css')
+        );
+
         return `<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} https://cdnjs.cloudflare.com 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com;">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} https://cdnjs.cloudflare.com 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com; font-src ${webview.cspSource} https://cdnjs.cloudflare.com;">
             <title>Codexpilot Chat</title>
             <link rel="stylesheet" type="text/css" href="${styleUri}">
+            <link rel="stylesheet" href="${codiconsUri}">
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/vs2015.min.css">
             <style>
-                /* VS Code Codicon styles */
-                .codicon {
-                    font-family: 'codicon';
-                    font-size: 16px;
-                    font-style: normal;
-                    font-weight: normal;
-                    display: inline-block;
-                    text-decoration: none;
-                    text-rendering: auto;
-                    text-align: center;
-                    -webkit-font-smoothing: antialiased;
-                    -moz-osx-font-smoothing: grayscale;
-                    user-select: none;
-                    -webkit-user-select: none;
+                /* Custom styles for our UI elements */
+                .code-button .codicon {
+                    font-size: 14px;
+                    line-height: 1;
                 }
 
-                /* Codicon icons */
-                .codicon-send:before { content: '\\ea77'; }
-                .codicon-copy:before { content: '\\eb03'; }
-                .codicon-insert:before { content: '\\ea7a'; }
-                .codicon-add:before { content: '\\ea60'; }
-                .codicon-check:before { content: '\\eab2'; }
-                .codicon-error:before { content: '\\ea87'; }
-                .codicon-loading:before { content: '\\eb19'; }
-                .codicon-comment-discussion:before { content: '\\ea90'; }
-                .codicon-chevron-down:before { content: '\\eab4'; }
-                .codicon-robot:before { content: '\\eb70'; }
-                .codicon-mention:before { content: '\\eba3'; }
-
-                /* Fallback if codicon font is not available */
-                @font-face {
-                    font-family: 'codicon';
-                    src: url('${webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'codicon.ttf'))}');
+                #mode-picker-button .codicon {
+                    font-size: 12px;
                 }
 
-                /* Fallback content for icons */
-                .codicon-send:not(:before) { content: '→'; }
-                .codicon-copy:not(:before) { content: 'C'; }
-                .codicon-insert:not(:before) { content: 'I'; }
-                .codicon-add:not(:before) { content: '+'; }
-                .codicon-check:not(:before) { content: '✓'; }
-                .codicon-error:not(:before) { content: '!'; }
-                .codicon-loading:not(:before) { content: '⟳'; }
-                .codicon-comment-discussion:not(:before) { content: '💬'; }
-                .codicon-chevron-down:not(:before) { content: '▼'; }
-                .codicon-robot:not(:before) { content: '🤖'; }
-                .codicon-mention:not(:before) { content: '@'; }
+                #send-button .codicon {
+                    font-size: 12px;
+                }
+
+                #context-add-button .codicon {
+                    font-size: 14px;
+                }
+
+                .soon-tag {
+                    font-size: 0.8em;
+                    opacity: 0.7;
+                    margin-left: 4px;
+                }
             </style>
         </head>
         <body>
@@ -432,7 +414,7 @@ ${userQuery}`;
                     <!-- Chat messages will appear here -->
                     <div class="welcome-message">
                         <h2>Welcome to Codexpilot!</h2>
-                        <p>Add files to the context by typing @ followed by a filename (e.g., @main.js).</p>
+                        <p>Add files to the context by typing @ followed by a filename</p>
                     </div>
                 </div>
                 <div id="input-area">
@@ -440,7 +422,7 @@ ${userQuery}`;
                         <div id="context-pills">
                             <!-- Context file pills will be added here dynamically -->
                         </div>
-                        <textarea id="user-input" placeholder="Ask Codexpilot... (Use @ to add files to context)"></textarea>
+                        <textarea id="user-input" placeholder="Ask Codexpilot"></textarea>
                         <button id="send-button" title="Send Message">
                             <i class="codicon codicon-send"></i>
                         </button>
