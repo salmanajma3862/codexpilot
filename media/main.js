@@ -202,21 +202,39 @@
 
             console.log('@ pattern detected! Query:', query, 'at position:', atIndex);
 
+            // If the query is empty (just @), show recent files
+            if (!query) {
+                console.log('Empty query, showing recent files');
+                currentSearchQuery = '';
+                showRecentFiles();
+            }
             // If the query is not empty and different from the current search
-            if (query && query !== currentSearchQuery) {
+            else if (query !== currentSearchQuery) {
                 console.log('New search query detected:', query);
                 currentSearchQuery = query;
                 searchFiles(query);
-            } else if (!query) {
-                console.log('Empty query, hiding search results');
-                // If the query is empty, hide the search results
-                hideFileSearch();
             }
         } else {
             console.log('No @ pattern detected or not at word boundary, hiding search results');
             // If there's no @ symbol before the cursor, hide the search results
             hideFileSearch();
         }
+    }
+
+    // Function to show recent files
+    function showRecentFiles() {
+        console.log('Showing recent files');
+
+        // Show loading indicator
+        showFileSearchLoading();
+
+        // Send request to get recent files
+        const message = {
+            type: 'getRecentFiles'
+        };
+
+        console.log('Sending message to extension:', message);
+        vscode.postMessage(message);
     }
 
     // Function to search for files
@@ -278,26 +296,28 @@
     function positionFileSearchContainer() {
         console.log('Positioning file search container');
 
-        // Get the input area and user input element positions
-        const userInputRect = document.getElementById('user-input').getBoundingClientRect();
-        const containerRect = document.getElementById('input-area').getBoundingClientRect();
+        // Get the input area position
+        const inputAreaRect = document.getElementById('input-area').getBoundingClientRect();
 
-        // Calculate position to place it above the user input
-        const bottom = containerRect.bottom - userInputRect.top;
-        const left = 0; // Align with the left edge of the input area
+        // Calculate position to place it above the input area
+        const top = inputAreaRect.top - 10; // Position above input area with a small gap
+        const left = inputAreaRect.left + 10; // Align with the left edge of the input area with padding
+        const width = inputAreaRect.width - 20; // Account for padding
 
         console.log('Positioning data:', {
-            userInputRect,
-            containerRect,
-            calculatedBottom: bottom
+            inputAreaRect,
+            calculatedTop: top,
+            calculatedLeft: left,
+            calculatedWidth: width
         });
 
-        // Set the position
-        fileSearchContainer.style.position = 'absolute';
-        fileSearchContainer.style.bottom = `${bottom}px`; // Position above input
+        // Set the position using fixed positioning
+        fileSearchContainer.style.position = 'fixed';
+        fileSearchContainer.style.top = 'auto'; // Clear any previous top value
+        fileSearchContainer.style.bottom = `${window.innerHeight - top}px`; // Position from bottom of viewport
         fileSearchContainer.style.left = `${left}px`;
-        fileSearchContainer.style.width = `${containerRect.width - 20}px`; // Account for padding
-        fileSearchContainer.style.maxHeight = '200px';
+        fileSearchContainer.style.width = `${width}px`;
+        fileSearchContainer.style.maxHeight = '300px';
         fileSearchContainer.style.overflowY = 'auto';
         fileSearchContainer.style.zIndex = '1000';
         fileSearchContainer.style.backgroundColor = 'var(--vscode-editorWidget-background, var(--vscode-editor-background))';
@@ -308,8 +328,8 @@
     }
 
     // Function to display file search results
-    function displayFileSearchResults(results) {
-        console.log('displayFileSearchResults called with results:', results);
+    function displayFileSearchResults(results, isRecent = false) {
+        console.log('displayFileSearchResults called with results:', results, 'isRecent:', isRecent);
 
         if (!isSearching) {
             console.log('Not searching, ignoring results');
@@ -332,6 +352,15 @@
 
         console.log('Creating results list with', results.length, 'items');
         fileSearchContainer.innerHTML = '';
+
+        // Add header if showing recent files
+        if (isRecent) {
+            const header = document.createElement('div');
+            header.className = 'file-search-header';
+            header.textContent = 'Recently Opened Files';
+            fileSearchContainer.appendChild(header);
+        }
+
         const resultsList = document.createElement('ul');
         resultsList.className = 'file-search-results';
         resultsList.style.listStyle = 'none';
@@ -339,10 +368,13 @@
         resultsList.style.margin = '0';
 
         results.forEach((result, index) => {
-            console.log('Adding result item:', result.path);
+            // Use label for display if available (for recent files), otherwise use path
+            const displayText = result.label || result.path;
+            console.log('Adding result item:', displayText);
+
             const resultItem = document.createElement('li');
             resultItem.className = 'file-search-result';
-            resultItem.textContent = result.path;
+            resultItem.textContent = displayText;
             resultItem.style.padding = '8px 12px';
             resultItem.style.cursor = 'pointer';
             resultItem.style.borderBottom = index < results.length - 1 ? '1px solid var(--vscode-panel-border)' : 'none';
@@ -538,7 +570,8 @@
             case 'fileSearchResults':
                 console.log('Handling fileSearchResults with results:', message.results);
                 console.log('Number of results:', message.results ? message.results.length : 0);
-                displayFileSearchResults(message.results);
+                console.log('Is recent files:', message.isRecent);
+                displayFileSearchResults(message.results, message.isRecent);
                 break;
             case 'fileAddedToContext':
                 if (message.success) {

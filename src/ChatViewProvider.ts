@@ -99,6 +99,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     await this.showHistory();
                     break;
 
+                case 'getRecentFiles':
+                    console.log('Received getRecentFiles request');
+                    await this.getRecentFiles();
+                    break;
+
                 default:
                     console.log('Unhandled message type:', message.type);
             }
@@ -281,6 +286,56 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
      */
     public getCurrentChatId(): string | null {
         return this.currentChatId;
+    }
+
+    /**
+     * Get recent files (currently open editor tabs)
+     */
+    private async getRecentFiles(): Promise<void> {
+        try {
+            console.log('Getting recent files from open editors');
+
+            const openFiles: { label: string, uriString: string }[] = [];
+
+            // Use tabGroups API to get open editor tabs
+            for (const tabGroup of vscode.window.tabGroups.all) {
+                for (const tab of tabGroup.tabs) {
+                    if (tab.input instanceof vscode.TabInputText ||
+                        (tab as any).input instanceof vscode.TabInputCustom) {
+                        const uri = (tab.input as any).uri;
+                        if (uri && uri.scheme === 'file') { // Only include file URIs
+                            // Avoid duplicates
+                            if (!openFiles.some(f => f.uriString === uri.toString())) {
+                                openFiles.push({
+                                    label: vscode.workspace.asRelativePath(uri),
+                                    uriString: uri.toString()
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Limit to 10 recent files
+            const recentFiles = openFiles.slice(0, 10);
+
+            console.log('Sending recent files:', recentFiles.length);
+
+            // Send the results back to the webview
+            this.sendMessageToWebview({
+                type: 'fileSearchResults',
+                results: recentFiles,
+                isRecent: true
+            });
+        } catch (error) {
+            console.error('Error getting recent files:', error);
+            this.sendMessageToWebview({
+                type: 'fileSearchResults',
+                results: [],
+                error: 'Error getting recent files',
+                isRecent: true
+            });
+        }
     }
 
     /**

@@ -445,12 +445,13 @@ body {
     background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
     border: 1px solid var(--vscode-editorWidget-border, var(--vscode-input-border));
     border-radius: 6px;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-    max-height: 200px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    max-height: 300px;
     overflow-y: auto;
-    z-index: 100;
+    z-index: 1000; /* Higher z-index to ensure it appears above other elements */
     scrollbar-width: thin;
     scrollbar-color: var(--vscode-scrollbarSlider-background) transparent;
+    position: fixed; /* Use fixed positioning to avoid clipping */
 }
 
 .file-search-container::-webkit-scrollbar {
@@ -504,6 +505,17 @@ body {
     text-align: center;
     color: var(--vscode-descriptionForeground);
     font-size: 12px;
+}
+
+.file-search-header {
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--vscode-descriptionForeground);
+    background-color: var(--vscode-editorWidget-background);
+    border-bottom: 1px solid var(--vscode-editorWidget-border, var(--vscode-panel-border));
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 /* Thinking Indicator Styles */
