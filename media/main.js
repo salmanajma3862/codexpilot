@@ -12,6 +12,9 @@
     const modePickerButton = document.getElementById('mode-picker-button');
     const modeDropdown = document.getElementById('mode-dropdown');
     const contextAddButton = document.getElementById('context-add-button');
+    const newChatButton = document.getElementById('new-chat-button');
+    const historyButton = document.getElementById('history-button');
+    const settingsButton = document.getElementById('settings-button');
 
     // Create file search results container
     const fileSearchContainer = document.createElement('div');
@@ -28,6 +31,7 @@
     let currentAssistantMessageElement = null;
     let accumulatedResponseText = '';
     let currentMode = 'chat'; // Default mode
+    let buttonRowHeight = 30; // Default height for button row, will be calculated after DOM is ready
 
     // Animation state for smooth character-by-character display
     let characterQueue = []; // Stores characters to be displayed
@@ -58,6 +62,25 @@
     // Add input event listeners
     userInputElement.addEventListener('input', handleInputChange);
     userInputElement.addEventListener('input', autoResizeTextarea);
+
+    // Header button event listeners
+    newChatButton.addEventListener('click', () => {
+        console.log('New chat button clicked');
+        // Clear the chat UI
+        clearChatUI();
+        // Send message to extension to clear backend state
+        vscode.postMessage({ type: 'clearChat' });
+    });
+
+    historyButton.addEventListener('click', () => {
+        console.log('History button clicked');
+        vscode.postMessage({ type: 'showHistory' });
+    });
+
+    settingsButton.addEventListener('click', () => {
+        console.log('Settings button clicked (Not Implemented)');
+        vscode.postMessage({ type: 'showInfoMessage', text: 'Settings feature coming soon!' });
+    });
 
     // Mode picker dropdown functionality
     modePickerButton.addEventListener('click', (event) => {
@@ -126,7 +149,19 @@
 
     // Function to auto-resize the textarea based on content
     function autoResizeTextarea() {
-        // Reset height to auto to get the correct scrollHeight
+        // Count the number of lines in the textarea
+        const lineCount = userInputElement.value.split('\n').length;
+
+        // Adjust padding-bottom based on line count to prevent overlap with buttons
+        if (lineCount > 1) {
+            // For multiline text, add padding at the bottom to make room for buttons
+            userInputElement.style.paddingBottom = `${buttonRowHeight}px`;
+        } else {
+            // For single line, use default padding
+            userInputElement.style.paddingBottom = '8px';
+        }
+
+        // Reset height to auto to get the correct scrollHeight (which now includes our dynamic padding)
         userInputElement.style.height = 'auto';
 
         // Set the height to match the content (with a max height)
@@ -148,9 +183,27 @@
                 userInputElement.style.overflowY = 'hidden';
             }
         }
+
+        console.log(`Textarea adjusted: ${lineCount} lines, padding-bottom: ${userInputElement.style.paddingBottom}`);
     }
 
-    // Initialize textarea height
+    // Calculate button row height after DOM is fully loaded
+    function calculateButtonRowHeight() {
+        // Get the mode picker button element
+        const modePickerContainer = document.getElementById('mode-picker-container');
+        if (modePickerContainer) {
+            // Calculate the actual height including padding
+            const modePickerRect = modePickerContainer.getBoundingClientRect();
+            buttonRowHeight = modePickerRect.height + 10; // Add some extra padding
+            console.log('Calculated button row height:', buttonRowHeight);
+        }
+    }
+
+    // Initialize textarea height and calculate button row height
+    calculateButtonRowHeight();
+
+    // Set initial padding and height
+    userInputElement.style.paddingBottom = '8px'; // Default for single line
     autoResizeTextarea();
 
     // Function to handle input changes and detect @ mentions
@@ -525,6 +578,14 @@
                     console.error('Failed to add file to context:', message.error);
                 }
                 break;
+            case 'restoreChat':
+                console.log('Handling restoreChat with history length:', message.history.length);
+                restoreChat(message.history);
+                break;
+            case 'restoreContextPills':
+                console.log('Handling restoreContextPills with paths:', message.contextPaths);
+                restoreContextPills(message.contextPaths, message.contextUriStrings);
+                break;
             default:
                 console.log('Unhandled message type:', message.type);
         }
@@ -545,6 +606,10 @@
 
             // Clear input
             userInputElement.value = '';
+
+            // Reset padding and resize the textarea
+            userInputElement.style.paddingBottom = '8px';
+            autoResizeTextarea();
         }
     }
 
@@ -766,7 +831,7 @@
         welcomeMessage.className = 'welcome-message';
         welcomeMessage.innerHTML = `
             <h2>Welcome to Codexpilot!</h2>
-            <p>Add files to the context using the command palette and start chatting.</p>
+            <p>Add files to the context by typing @ followed by a filename</p>
         `;
         chatHistoryElement.appendChild(welcomeMessage);
 
@@ -775,6 +840,120 @@
 
         // Save state
         saveState();
+    }
+
+    /**
+     * Clear the chat UI including messages and context pills
+     */
+    function clearChatUI() {
+        // Clear chat messages
+        chatHistoryElement.innerHTML = '';
+
+        // Add welcome message back
+        const welcomeMessage = document.createElement('div');
+        welcomeMessage.className = 'welcome-message';
+        welcomeMessage.innerHTML = `
+            <h2>Welcome to Codexpilot!</h2>
+            <p>Add files to the context by typing @ followed by a filename</p>
+        `;
+        chatHistoryElement.appendChild(welcomeMessage);
+
+        // Clear context pills
+        contextPillsElement.innerHTML = '';
+
+        // Clear chat history array
+        chatHistory = [];
+
+        // Add a system message
+        addSystemMessage('New chat started');
+
+        // Save state
+        saveState();
+    }
+
+    /**
+     * Add a system message to the chat
+     * @param {string} text The message text
+     */
+    function addSystemMessage(text) {
+        // Create message element
+        const messageElement = document.createElement('div');
+        messageElement.className = 'message system-message';
+
+        const textElement = document.createElement('div');
+        textElement.className = 'message-text';
+        textElement.textContent = text;
+
+        messageElement.appendChild(textElement);
+        chatHistoryElement.appendChild(messageElement);
+
+        // Scroll to bottom
+        chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
+    }
+
+    /**
+     * Restore a chat from history
+     * @param {Array} history The conversation history to restore
+     */
+    function restoreChat(history) {
+        // Clear the current chat
+        chatHistoryElement.innerHTML = '';
+
+        // If history is empty, show welcome message
+        if (!history || history.length === 0) {
+            const welcomeMessage = document.createElement('div');
+            welcomeMessage.className = 'welcome-message';
+            welcomeMessage.innerHTML = `
+                <h2>Welcome to Codexpilot!</h2>
+                <p>Add files to the context by typing @ followed by a filename</p>
+            `;
+            chatHistoryElement.appendChild(welcomeMessage);
+            return;
+        }
+
+        // Add a system message indicating chat was loaded
+        addSystemMessage('Chat loaded from history');
+
+        // Loop through the history and add messages
+        for (const message of history) {
+            if (message.role === 'user') {
+                // For user messages, extract the actual query if it contains context
+                let userText = message.parts[0].text;
+                if (userText.includes('USER QUERY:')) {
+                    userText = userText.split('USER QUERY:')[1].trim();
+                }
+                addChatMessage('user', userText);
+            } else if (message.role === 'model') {
+                // For model messages, render as assistant
+                addChatMessage('assistant', message.parts[0].text);
+            }
+        }
+
+        // Scroll to bottom
+        chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
+    }
+
+    /**
+     * Restore context pills from history
+     * @param {Array} contextPaths The paths of the context files
+     * @param {Array} contextUriStrings The URI strings of the context files
+     */
+    function restoreContextPills(contextPaths, contextUriStrings) {
+        // Clear existing pills
+        contextPillsElement.innerHTML = '';
+
+        // Create pills for each file
+        if (contextPaths && contextPaths.length > 0) {
+            contextPaths.forEach((path, index) => {
+                // Create a file object for the pill
+                const file = {
+                    path: path,
+                    uriString: contextUriStrings[index] || ''
+                };
+
+                createContextPill(file);
+            });
+        }
     }
 
     // Function to show thinking indicator

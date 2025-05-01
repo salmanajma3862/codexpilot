@@ -15,12 +15,59 @@ body {
     overflow: hidden;
     font-size: var(--vscode-font-size, 13px);
     line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Header Styles */
+#view-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: var(--vscode-titleBar-activeBackground, var(--vscode-sideBar-background));
+    border-bottom: 1px solid var(--vscode-sideBar-border);
+    z-index: 20;
+}
+
+#view-title {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--vscode-titleBar-activeForeground, var(--vscode-foreground));
+}
+
+#header-actions {
+    display: flex;
+    gap: 8px;
+}
+
+#header-actions .icon-button {
+    background: none;
+    border: none;
+    color: var(--vscode-icon-foreground, var(--vscode-foreground));
+    padding: 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease;
+}
+
+#header-actions .icon-button:hover {
+    background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+#header-actions .icon-button .codicon {
+    font-size: 16px;
 }
 
 #webview-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    flex: 1;
     overflow: hidden;
     background-color: var(--vscode-editor-background);
     border: 1px solid var(--vscode-sideBar-border);
@@ -105,6 +152,19 @@ body {
     /* Only keeping alignment and width properties */
 }
 
+.system-message {
+    align-self: center;
+    max-width: 80%;
+    margin: 8px auto;
+    padding: 6px 12px;
+    background-color: var(--vscode-badge-background, var(--vscode-button-secondaryBackground));
+    color: var(--vscode-badge-foreground, var(--vscode-button-secondaryForeground));
+    border-radius: 12px;
+    font-size: 12px;
+    opacity: 0.8;
+    text-align: center;
+}
+
 .message-sender {
     font-weight: 500;
     margin-bottom: 6px;
@@ -136,9 +196,10 @@ body {
 #input-area {
     display: flex;
     flex-direction: column;
-    padding: 10px 14px;
-    /* Removed border-top as requested */
     background-color: var(--vscode-editor-background);
+    padding-left: 5px;
+    padding-right: 5px;
+    padding-bottom: 5px;
     position: relative;
     z-index: 10;
 }
@@ -146,31 +207,32 @@ body {
 /* Mode Picker Styles */
 #mode-picker-container {
     position: absolute;
-    bottom: 10px;
+    bottom: 8px; /* Adjusted for better vertical alignment */
     left: 10px;
-    z-index: 20;
+    z-index: 30; /* Increased z-index to ensure it's above the textarea content */
 }
 
 #mode-picker-button {
-    background-color: transparent;
-    color: var(--vscode-foreground);
-    border: 1px solid var(--vscode-panel-border);
+    background-color: var(--vscode-editor-background); /* Add background to ensure visibility */
+    color: var(--vscode-icon-foreground); /* Use icon foreground for consistency */
+    border: none;
     border-radius: 3px;
-    padding: 2px 6px;
-    font-size: 11px;
+    padding: 4px 6px; /* Consistent padding */
+    font-size: 12px; /* Consistent font size */
     cursor: pointer;
     transition: all 0.15s ease;
     display: flex;
     align-items: center;
     gap: 4px;
+    line-height: 1; /* Consistent line height */
 }
 
 #mode-picker-button:hover {
-    background-color: var(--vscode-list-hoverBackground);
+    background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
 }
 
 #mode-picker-button .codicon {
-    font-size: 12px;
+    font-size: 14px; /* Consistent icon size */
 }
 
 .mode-dropdown {
@@ -226,25 +288,25 @@ body {
 /* Context Add Button */
 #context-add-button {
     position: absolute;
-    bottom: 10px;
+    bottom: 8px;
     left: 80px; /* Position it to the right of the mode picker */
-    background: none;
-    border: 1px solid var(--vscode-panel-border);
+    background-color: var(--vscode-editor-background); /* Add background to ensure visibility */
+    border: none;
     border-radius: 3px;
-    width: 24px;
-    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: var(--vscode-foreground);
+    color: var(--vscode-icon-foreground);
     transition: all 0.15s ease;
-    z-index: 20;
-    padding: 0;
+    z-index: 30; /* Increased z-index to ensure it's above the textarea content */
+    padding: 4px; /* Consistent padding */
+    font-size: 12px; /* Consistent font size */
+    line-height: 1; /* Consistent line height */
 }
 
 #context-add-button:hover {
-    background-color: var(--vscode-list-hoverBackground);
+    background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
 }
 
 #context-add-button .codicon {
@@ -258,11 +320,12 @@ body {
     position: relative;
     border: 1px solid var(--vscode-input-border);
     border-radius: 6px;
-    background-color: var(--vscode-input-background);
     overflow: hidden;
     min-height: 40px;
     max-height: 200px;
     transition: border-color 0.15s ease;
+    width: 100%;
+    margin-left: 0; /* Ensure no margin */
 }
 
 #input-wrapper:focus-within {
@@ -320,7 +383,7 @@ body {
 #user-input {
     width: 100%;
     min-height: 38px;
-    padding: 8px 36px 8px 10px;
+    padding: 8px 36px 8px 10px; /* Restored to normal padding */
     border: none;
     background-color: transparent;
     color: var(--vscode-input-foreground);
@@ -343,7 +406,7 @@ body {
 
 #send-button {
     position: absolute;
-    bottom: 8px;
+    bottom: 8px; /* Consistent with other buttons */
     right: 8px;
     width: 24px;
     height: 24px;
@@ -357,6 +420,7 @@ body {
     cursor: pointer;
     transition: background-color 0.15s ease;
     padding: 0;
+    z-index: 20; /* Ensure it's above other elements */
 }
 
 #send-button .codicon {

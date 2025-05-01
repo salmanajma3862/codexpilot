@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { callGeminiApi, callGeminiApiStream } from './geminiApi';
+import { callGeminiApiStream } from './geminiApi';
 import { getApiKey, getContextFileUris } from './extension';
+import { ChatMessage, SavedChatSession } from './interfaces';
 
 // Interface for context management functions
 interface ContextManagement {
@@ -17,8 +18,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private _isProcessingMessage: boolean = false;
 
     // Conversation history for Gemini API
-    private conversationHistory: { role: 'user' | 'model', parts: [{ text: string }] }[] = [];
+    private conversationHistory: ChatMessage[] = [];
     private readonly MAX_HISTORY_LENGTH = 20; // Keep last 20 messages (10 turns)
+
+    // Current chat ID
+    private currentChatId: string | null = null;
 
     constructor(
         private readonly _extensionUri: vscode.Uri,
@@ -78,6 +82,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 case 'removeFileFromContext':
                     console.log('Received removeFileFromContext request with URI:', message.uriString);
                     await this.handleRemoveFileFromContext(message.uriString);
+                    break;
+
+                case 'clearChat':
+                    console.log('Received clearChat request');
+                    await this.clearConversationAndContext();
+                    break;
+
+                case 'showInfoMessage':
+                    console.log('Received showInfoMessage request:', message.text);
+                    vscode.window.showInformationMessage(message.text);
+                    break;
+
+                case 'showHistory':
+                    console.log('Received showHistory request');
+                    await this.showHistory();
                     break;
 
                 default:
@@ -166,6 +185,204 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private clearConversationHistory() {
         console.log('Clearing conversation history');
         this.conversationHistory = [];
+    }
+
+    /**
+     * Clear both conversation history and context
+     * This is called when starting a new chat
+     */
+    private async clearConversationAndContext(): Promise<void> {
+        // Save the current chat before clearing it
+        await this.saveCurrentChatSession();
+
+        // Generate a new chat ID
+        this.currentChatId = Date.now().toString();
+
+        // Clear conversation history
+        this.clearConversationHistory();
+
+        // Clear context files
+        this._currentContextUris = [];
+
+        // Call the clearContext command to clear the global context state
+        await vscode.commands.executeCommand('codexpilot.clearContext');
+
+        console.log('Chat and context cleared via webview button');
+    }
+
+    /**
+     * Save the current chat session to history
+     */
+    private async saveCurrentChatSession(): Promise<void> {
+        // Only save if there are messages in the history
+        if (this.conversationHistory.length > 0) {
+            // Import the saveChatSession function
+            const { saveChatSession } = require('./extension');
+
+            // Generate an ID if one doesn't exist
+            if (!this.currentChatId) {
+                this.currentChatId = Date.now().toString();
+            }
+
+            // Get the first user message for the title
+            let title = 'Chat Session';
+            for (const message of this.conversationHistory) {
+                if (message.role === 'user') {
+                    // Extract a title from the first user message
+                    const userText = message.parts[0].text;
+                    // Remove context prefix if present
+                    const userQuery = userText.includes('USER QUERY:')
+                        ? userText.split('USER QUERY:')[1].trim()
+                        : userText;
+
+                    // Limit title length
+                    title = userQuery.length > 50
+                        ? userQuery.substring(0, 47) + '...'
+                        : userQuery;
+
+                    break;
+                }
+            }
+
+            // Create the session object
+            const sessionToSave = {
+                id: this.currentChatId,
+                title: title,
+                timestamp: Date.now(),
+                conversationHistory: this.conversationHistory,
+                contextUriStrings: this._currentContextUris.map(uri => uri.toString())
+            };
+
+            // Save the session
+            saveChatSession(this._context, sessionToSave);
+            console.log(`Saved chat session: ${sessionToSave.id} - ${sessionToSave.title}`);
+        }
+    }
+
+    /**
+     * Get the current conversation history
+     * @returns The current conversation history
+     */
+    public getCurrentHistory(): ChatMessage[] {
+        return this.conversationHistory;
+    }
+
+    /**
+     * Get the current context URI strings
+     * @returns The current context URI strings
+     */
+    public getCurrentContextUriStrings(): string[] {
+        return this._currentContextUris.map(uri => uri.toString());
+    }
+
+    /**
+     * Get the current chat ID
+     * @returns The current chat ID or null if no chat is active
+     */
+    public getCurrentChatId(): string | null {
+        return this.currentChatId;
+    }
+
+    /**
+     * Show the chat history in a Quick Pick menu
+     */
+    private async showHistory(): Promise<void> {
+        // Import the getChatHistoryList function
+        const { getChatHistoryList } = require('./extension');
+
+        // Get the list of saved chat sessions
+        const historyList = getChatHistoryList(this._context);
+
+        // Check if the list is empty
+        if (!historyList || historyList.length === 0) {
+            vscode.window.showInformationMessage('No saved chat history found.');
+            return;
+        }
+
+        // Format the list for the Quick Pick
+        const quickPickItems: vscode.QuickPickItem[] = historyList.map((session: SavedChatSession) => ({
+            label: session.title,
+            description: new Date(session.timestamp).toLocaleString(),
+            detail: session.id
+        }));
+
+        // Show the Quick Pick
+        const selectedItem = await vscode.window.showQuickPick(quickPickItems, {
+            placeHolder: 'Select a chat session to load'
+        });
+
+        // If the user selected an item, load the chat
+        if (selectedItem && selectedItem.detail) {
+            console.log('User selected chat ID to load:', selectedItem.detail);
+            await this.loadChatFromHistory(selectedItem.detail);
+        }
+    }
+
+    /**
+     * Load a chat from history
+     * @param chatId The ID of the chat to load
+     */
+    private async loadChatFromHistory(chatId: string): Promise<void> {
+        // Import the getChatSessionById function
+        const { getChatSessionById, setActiveContextUris } = require('./extension');
+
+        // Get the chat session
+        const sessionToLoad = getChatSessionById(this._context, chatId);
+
+        // Check if the session exists
+        if (!sessionToLoad) {
+            vscode.window.showErrorMessage('Could not load selected chat session.');
+            return;
+        }
+
+        // Clear the current state without saving
+        await this.clearUiAndStateWithoutSaving();
+
+        // Set the chat ID
+        this.currentChatId = sessionToLoad.id;
+
+        // Load the conversation history
+        this.conversationHistory = sessionToLoad.conversationHistory;
+
+        // Load the context URIs
+        this._currentContextUris = sessionToLoad.contextUriStrings.map((uriString: string) => vscode.Uri.parse(uriString));
+
+        // Update the context file list in extension.ts
+        setActiveContextUris(this._currentContextUris);
+
+        // Update the webview UI
+        this.sendMessageToWebview({
+            type: 'restoreChat',
+            history: this.conversationHistory
+        });
+
+        // Send paths for pills
+        const contextPaths = this._currentContextUris.map(uri => vscode.workspace.asRelativePath(uri));
+        this.sendMessageToWebview({
+            type: 'restoreContextPills',
+            contextPaths: contextPaths,
+            contextUriStrings: sessionToLoad.contextUriStrings
+        });
+
+        // Show success message
+        vscode.window.showInformationMessage(`Loaded chat: ${sessionToLoad.title}`);
+    }
+
+    /**
+     * Clear UI and state without saving the current chat
+     * Used when loading a chat from history
+     */
+    private async clearUiAndStateWithoutSaving(): Promise<void> {
+        // Clear conversation history
+        this.conversationHistory = [];
+
+        // Clear context files
+        this._currentContextUris = [];
+
+        // Call the clearContext command to clear the global context state
+        await vscode.commands.executeCommand('codexpilot.clearContext');
+
+        console.log('Chat and context cleared for loading history');
     }
 
     /**
@@ -281,6 +498,12 @@ If the user asks about code and there's no context provided, just answer based o
 
             // Determine if we have actual context files or just the default message
             const hasRealContext = contextContent !== "No context files provided.";
+
+            // If this is the first message in a new chat, generate a chat ID
+            if (this.conversationHistory.length === 0 && !this.currentChatId) {
+                this.currentChatId = Date.now().toString();
+                console.log(`Started new chat with ID: ${this.currentChatId}`);
+            }
 
             // Add the user's message to the conversation history
             // If this is the first message and we have context, include the context in the message
@@ -452,6 +675,23 @@ If the user asks about code and there's no context provided, just answer based o
             </style>
         </head>
         <body>
+            <header id="view-header">
+                <div id="view-title">
+                    <span class="codicon codicon-beaker" style="margin-right: 5px;"></span>
+                    Codexpilot
+                </div>
+                <div id="header-actions">
+                    <button class="icon-button" id="new-chat-button" title="Start New Chat">
+                        <span class="codicon codicon-add"></span>
+                    </button>
+                    <button class="icon-button" id="history-button" title="Chat History (Coming Soon)">
+                        <span class="codicon codicon-history"></span>
+                    </button>
+                    <button class="icon-button" id="settings-button" title="Settings (Coming Soon)">
+                        <span class="codicon codicon-settings-gear"></span>
+                    </button>
+                </div>
+            </header>
             <div id="webview-container">
                 <div id="chat-history">
                     <!-- Chat messages will appear here -->

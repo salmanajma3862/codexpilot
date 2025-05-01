@@ -2,9 +2,14 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import { ChatViewProvider } from './ChatViewProvider';
+import { SavedChatSession } from './interfaces';
 
 // Constants for secret storage
 const SECRET_STORAGE_KEY = 'codexpilotGeminiApiKey';
+
+// Constants for chat history storage
+const HISTORY_STORAGE_KEY = 'codexpilotChatHistoryList';
+const MAX_SAVED_CHATS = 20;
 
 // Store context file URIs
 let contextFileUris: vscode.Uri[] = [];
@@ -12,11 +17,70 @@ let contextFileUris: vscode.Uri[] = [];
 // Store a reference to the ChatViewProvider instance
 let chatProviderInstance: ChatViewProvider | null = null;
 
+// Store a reference to the extension context
+let extensionContext: vscode.ExtensionContext;
+
 /**
  * Helper function to retrieve the API key from secure storage
  */
 export async function getApiKey(context: vscode.ExtensionContext): Promise<string | undefined> {
     return await context.secrets.get(SECRET_STORAGE_KEY);
+}
+
+/**
+ * Get the list of saved chat sessions
+ * @param context The extension context
+ * @returns An array of saved chat sessions
+ */
+export function getChatHistoryList(context: vscode.ExtensionContext): SavedChatSession[] {
+    return context.workspaceState.get<SavedChatSession[]>(HISTORY_STORAGE_KEY, []);
+}
+
+/**
+ * Save a chat session to the history
+ * @param context The extension context
+ * @param sessionToSave The chat session to save
+ */
+export function saveChatSession(context: vscode.ExtensionContext, sessionToSave: SavedChatSession): void {
+    // Get the current list
+    const currentList = getChatHistoryList(context);
+
+    // Remove any existing session with the same ID (to handle updates)
+    const filteredList = currentList.filter(session => session.id !== sessionToSave.id);
+
+    // Add the new session to the beginning of the list
+    const updatedList = [sessionToSave, ...filteredList];
+
+    // Sort the list by timestamp descending
+    updatedList.sort((a, b) => b.timestamp - a.timestamp);
+
+    // Trim the list if it exceeds the maximum number of saved chats
+    const trimmedList = updatedList.slice(0, MAX_SAVED_CHATS);
+
+    // Update the workspace state
+    context.workspaceState.update(HISTORY_STORAGE_KEY, trimmedList);
+
+    console.log(`Saved chat session: ${sessionToSave.id} - ${sessionToSave.title}`);
+}
+
+/**
+ * Get a chat session by ID
+ * @param context The extension context
+ * @param chatId The chat ID to find
+ * @returns The chat session with the specified ID, or undefined if not found
+ */
+export function getChatSessionById(context: vscode.ExtensionContext, chatId: string): SavedChatSession | undefined {
+    const chatList = getChatHistoryList(context);
+    return chatList.find(session => session.id === chatId);
+}
+
+/**
+ * Set the active context URIs
+ * @param uris The URIs to set as the active context
+ */
+export function setActiveContextUris(uris: vscode.Uri[]): void {
+    contextFileUris = [...uris];
+    updateContextInWebview();
 }
 
 /**
@@ -191,6 +255,9 @@ export function activate(context: vscode.ExtensionContext) {
 	// Show a notification to confirm the extension is activated
 	vscode.window.showInformationMessage('Codexpilot extension is now active!');
 
+    // Store the extension context for later use
+    extensionContext = context;
+
 	// Register the ChatViewProvider with access to context management functions
 	const chatViewProvider = new ChatViewProvider(
         context.extensionUri,
@@ -256,4 +323,50 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+    // Save the current chat session if there is one
+    if (chatProviderInstance) {
+        const history = chatProviderInstance.getCurrentHistory();
+        const contextUriStrings = chatProviderInstance.getCurrentContextUriStrings();
+        const currentChatId = chatProviderInstance.getCurrentChatId();
+
+        // Only save if there are messages in the history
+        if (history.length > 0) {
+            // Generate an ID if one doesn't exist
+            const id = currentChatId || Date.now().toString();
+
+            // Get the first user message for the title
+            let title = 'Chat Session';
+            for (const message of history) {
+                if (message.role === 'user') {
+                    // Extract a title from the first user message
+                    const userText = message.parts[0].text;
+                    // Remove context prefix if present
+                    const userQuery = userText.includes('USER QUERY:')
+                        ? userText.split('USER QUERY:')[1].trim()
+                        : userText;
+
+                    // Limit title length
+                    title = userQuery.length > 50
+                        ? userQuery.substring(0, 47) + '...'
+                        : userQuery;
+
+                    break;
+                }
+            }
+
+            // Create the session object
+            const sessionToSave = {
+                id: id,
+                title: title,
+                timestamp: Date.now(),
+                conversationHistory: history,
+                contextUriStrings: contextUriStrings
+            };
+
+            // Save the session
+            saveChatSession(extensionContext, sessionToSave);
+            console.log(`Saved chat session on deactivate: ${sessionToSave.id} - ${sessionToSave.title}`);
+        }
+    }
+}
