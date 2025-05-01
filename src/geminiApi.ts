@@ -88,22 +88,60 @@ export async function callGeminiApi(apiKey: string, prompt: string): Promise<str
 /**
  * Call the Gemini API with streaming response
  * @param apiKey The Gemini API key
- * @param prompt The prompt to send to the API
+ * @param promptOrHistory The prompt string or conversation history to send to the API
+ * @param systemInstruction Optional system instruction for the model
  * @param onChunk Callback function to handle each chunk of the response
  * @returns A promise that resolves when the stream is complete
  */
 export async function callGeminiApiStream(
     apiKey: string,
-    prompt: string,
-    onChunk: (chunk: string) => void
+    promptOrHistory: string | { role: 'user' | 'model', parts: [{ text: string }] }[],
+    systemInstructionOrCallback?: string | ((chunk: string) => void),
+    onChunkCallback?: (chunk: string) => void
 ): Promise<void> {
     try {
         const model = getGeminiModel(apiKey);
 
         console.log("Calling Gemini API with streaming...");
 
-        // Generate content stream
-        const result = await model.generateContentStream(prompt);
+        // Determine if we're using conversation history or a simple prompt
+        const isUsingHistory = typeof promptOrHistory !== 'string';
+
+        // Determine the callback function based on arguments
+        const onChunk = onChunkCallback ||
+            (typeof systemInstructionOrCallback === 'function' ?
+                systemInstructionOrCallback :
+                () => {});
+
+        // Determine if we have a system instruction
+        const systemInstruction = typeof systemInstructionOrCallback === 'string' ?
+            systemInstructionOrCallback :
+            undefined;
+
+        // Generate content stream based on input type
+        let result;
+
+        if (isUsingHistory) {
+            // Using conversation history
+            console.log(`Using conversation history with ${promptOrHistory.length} messages`);
+
+            if (systemInstruction) {
+                // With system instruction
+                result = await model.generateContentStream({
+                    contents: promptOrHistory,
+                    systemInstruction: systemInstruction
+                });
+            } else {
+                // Without system instruction
+                result = await model.generateContentStream({
+                    contents: promptOrHistory
+                });
+            }
+        } else {
+            // Using simple prompt string
+            console.log("Using simple prompt string");
+            result = await model.generateContentStream(promptOrHistory as string);
+        }
 
         // Process the stream
         let fullResponse = '';

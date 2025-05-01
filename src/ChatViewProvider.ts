@@ -16,6 +16,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private _currentContextUris: vscode.Uri[] = [];
     private _isProcessingMessage: boolean = false;
 
+    // Conversation history for Gemini API
+    private conversationHistory: { role: 'user' | 'model', parts: [{ text: string }] }[] = [];
+    private readonly MAX_HISTORY_LENGTH = 20; // Keep last 20 messages (10 turns)
+
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private readonly _context: vscode.ExtensionContext,
@@ -136,6 +140,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // Update our local copy of the context URIs
             this._currentContextUris = getContextFileUris();
 
+            // Clear conversation history when context changes
+            this.clearConversationHistory();
+
             // Send a response back to the webview
             this.sendMessageToWebview({
                 type: 'fileAddedToContext',
@@ -150,6 +157,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 error: 'Error adding file to context'
             });
         }
+    }
+
+    /**
+     * Clear the conversation history
+     * This should be called when the context changes
+     */
+    private clearConversationHistory() {
+        console.log('Clearing conversation history');
+        this.conversationHistory = [];
     }
 
     /**
@@ -175,6 +191,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
                 // Update our local copy of the context URIs
                 this._currentContextUris = getContextFileUris();
+
+                // Clear conversation history when context changes
+                this.clearConversationHistory();
 
                 console.log('File removed from context:', vscode.workspace.asRelativePath(uri));
             } else {
@@ -254,7 +273,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // Get the context content
             const contextContent = await this.readContextFiles();
 
-            // Construct the full prompt
+            // Construct the system message
             const systemMessage = `You are a helpful coding assistant in an IDE. You help users understand and modify code.
 Be explanatory and clear in your explanations.
 When showing code examples, use proper formatting with markdown.
@@ -263,19 +282,23 @@ If the user asks about code and there's no context provided, just answer based o
             // Determine if we have actual context files or just the default message
             const hasRealContext = contextContent !== "No context files provided.";
 
-            // Construct the prompt differently based on whether we have context
-            const fullPrompt = hasRealContext
-                ? `${systemMessage}
-
-CONTEXT FILES:
-${contextContent}
-
-USER QUERY:
-${userQuery}`
-                : `${systemMessage}
-
-USER QUERY:
-${userQuery}`;
+            // Add the user's message to the conversation history
+            // If this is the first message and we have context, include the context in the message
+            if (this.conversationHistory.length === 0 && hasRealContext) {
+                // For the first message, include context with the user query
+                this.conversationHistory.push({
+                    role: 'user',
+                    parts: [{
+                        text: `CONTEXT FILES:\n${contextContent}\n\nUSER QUERY:\n${userQuery}`
+                    }]
+                });
+            } else {
+                // For subsequent messages, just add the user query
+                this.conversationHistory.push({
+                    role: 'user',
+                    parts: [{ text: userQuery }]
+                });
+            }
 
             // Send a thinking indicator
             this.sendMessageToWebview({ type: 'geminiThinking' });
@@ -283,11 +306,18 @@ ${userQuery}`;
             // Send a message to prepare the UI for streaming
             this.sendMessageToWebview({ type: 'geminiStreamStart' });
 
-            // Call the Gemini API with streaming
+            // Create a variable to accumulate the complete response
+            let completeResponseText = '';
+
+            // Call the Gemini API with streaming and conversation history
             await callGeminiApiStream(
                 apiKey,
-                fullPrompt,
-                (chunk) => {
+                this.conversationHistory,
+                systemMessage,
+                (chunk: string) => {
+                    // Accumulate the complete response
+                    completeResponseText += chunk;
+
                     // Send each chunk to the webview
                     this.sendMessageToWebview({
                         type: 'geminiResponseChunk',
@@ -295,6 +325,19 @@ ${userQuery}`;
                     });
                 }
             );
+
+            // Add the assistant's response to the conversation history
+            this.conversationHistory.push({
+                role: 'model',
+                parts: [{ text: completeResponseText }]
+            });
+
+            // Trim history if it exceeds the maximum length
+            if (this.conversationHistory.length > this.MAX_HISTORY_LENGTH) {
+                this.conversationHistory = this.conversationHistory.slice(-this.MAX_HISTORY_LENGTH);
+            }
+
+            console.log(`Conversation history now has ${this.conversationHistory.length} messages`);
 
             // Send a message to indicate the stream has ended
             this.sendMessageToWebview({ type: 'geminiStreamEnd' });
