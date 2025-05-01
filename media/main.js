@@ -31,7 +31,6 @@
     let currentAssistantMessageElement = null;
     let accumulatedResponseText = '';
     let currentMode = 'chat'; // Default mode
-    let buttonRowHeight = 30; // Default height for button row, will be calculated after DOM is ready
 
     // Animation state for smooth character-by-character display
     let characterQueue = []; // Stores characters to be displayed
@@ -149,33 +148,22 @@
 
     // Function to auto-resize the textarea based on content
     function autoResizeTextarea() {
-        // Count the number of lines in the textarea
-        const lineCount = userInputElement.value.split('\n').length;
-
-        // Adjust padding-bottom based on line count to prevent overlap with buttons
-        if (lineCount > 1) {
-            // For multiline text, add padding at the bottom to make room for buttons
-            userInputElement.style.paddingBottom = `${buttonRowHeight}px`;
-        } else {
-            // For single line, use default padding
-            userInputElement.style.paddingBottom = '8px';
-        }
-
-        // Reset height to auto to get the correct scrollHeight (which now includes our dynamic padding)
+        // Reset height to auto to get the correct scrollHeight
         userInputElement.style.height = 'auto';
 
         // Set the height to match the content (with a max height)
         const newHeight = Math.min(userInputElement.scrollHeight, 150);
         userInputElement.style.height = newHeight + 'px';
 
-        // Ensure the input wrapper doesn't exceed max height
-        const inputWrapper = document.getElementById('input-wrapper');
-        if (inputWrapper) {
+        // Ensure the input area doesn't exceed max height
+        const inputArea = document.getElementById('input-area');
+        if (inputArea) {
             const pillsHeight = document.getElementById('context-pills').offsetHeight;
-            const maxWrapperHeight = 200; // Should match CSS max-height for #input-wrapper
+            const actionRowHeight = document.getElementById('action-button-row').offsetHeight;
+            const maxInputAreaHeight = 200; // Maximum height for the entire input area
 
-            // Adjust textarea max height based on pills height
-            const maxTextareaHeight = maxWrapperHeight - pillsHeight - 16; // 16px for padding
+            // Adjust textarea max height based on pills height and action row height
+            const maxTextareaHeight = maxInputAreaHeight - pillsHeight - actionRowHeight - 24; // 24px for padding and margins
             if (newHeight > maxTextareaHeight) {
                 userInputElement.style.height = maxTextareaHeight + 'px';
                 userInputElement.style.overflowY = 'auto';
@@ -183,27 +171,9 @@
                 userInputElement.style.overflowY = 'hidden';
             }
         }
-
-        console.log(`Textarea adjusted: ${lineCount} lines, padding-bottom: ${userInputElement.style.paddingBottom}`);
     }
 
-    // Calculate button row height after DOM is fully loaded
-    function calculateButtonRowHeight() {
-        // Get the mode picker button element
-        const modePickerContainer = document.getElementById('mode-picker-container');
-        if (modePickerContainer) {
-            // Calculate the actual height including padding
-            const modePickerRect = modePickerContainer.getBoundingClientRect();
-            buttonRowHeight = modePickerRect.height + 10; // Add some extra padding
-            console.log('Calculated button row height:', buttonRowHeight);
-        }
-    }
-
-    // Initialize textarea height and calculate button row height
-    calculateButtonRowHeight();
-
-    // Set initial padding and height
-    userInputElement.style.paddingBottom = '8px'; // Default for single line
+    // Initialize textarea height
     autoResizeTextarea();
 
     // Function to handle input changes and detect @ mentions
@@ -308,26 +278,25 @@
     function positionFileSearchContainer() {
         console.log('Positioning file search container');
 
-        // Get the input wrapper element's position
-        const inputWrapperRect = document.getElementById('input-wrapper').getBoundingClientRect();
+        // Get the input area and user input element positions
+        const userInputRect = document.getElementById('user-input').getBoundingClientRect();
         const containerRect = document.getElementById('input-area').getBoundingClientRect();
 
-        // Calculate position to place it above the input wrapper
-        const bottom = containerRect.bottom - inputWrapperRect.top;
-        const left = inputWrapperRect.left - containerRect.left;
+        // Calculate position to place it above the user input
+        const bottom = containerRect.bottom - userInputRect.top;
+        const left = 0; // Align with the left edge of the input area
 
         console.log('Positioning data:', {
-            inputWrapperRect,
+            userInputRect,
             containerRect,
-            calculatedBottom: bottom,
-            calculatedLeft: left
+            calculatedBottom: bottom
         });
 
         // Set the position
         fileSearchContainer.style.position = 'absolute';
         fileSearchContainer.style.bottom = `${bottom}px`; // Position above input
         fileSearchContainer.style.left = `${left}px`;
-        fileSearchContainer.style.width = `${inputWrapperRect.width}px`;
+        fileSearchContainer.style.width = `${containerRect.width - 20}px`; // Account for padding
         fileSearchContainer.style.maxHeight = '200px';
         fileSearchContainer.style.overflowY = 'auto';
         fileSearchContainer.style.zIndex = '1000';
@@ -607,8 +576,7 @@
             // Clear input
             userInputElement.value = '';
 
-            // Reset padding and resize the textarea
-            userInputElement.style.paddingBottom = '8px';
+            // Resize the textarea
             autoResizeTextarea();
         }
     }

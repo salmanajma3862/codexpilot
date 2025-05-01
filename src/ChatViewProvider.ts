@@ -701,33 +701,41 @@ If the user asks about code and there's no context provided, just answer based o
                     </div>
                 </div>
                 <div id="input-area">
-                    <div id="input-wrapper">
-                        <div id="context-pills">
-                            <!-- Context file pills will be added here dynamically -->
-                        </div>
-                        <textarea id="user-input" placeholder="Ask Codexpilot"></textarea>
-                        <button id="send-button" title="Send Message">
-                            <i class="codicon codicon-send"></i>
-                        </button>
+                    <!-- Context Pills Container -->
+                    <div id="context-pills">
+                        <!-- Context file pills will be added here dynamically -->
+                    </div>
 
-                        <!-- Mode Picker Dropdown -->
-                        <div id="mode-picker-container">
-                            <button id="mode-picker-button" class="mode-button" title="Select Mode">
-                                <i class="codicon codicon-comment-discussion"></i>
-                                <span id="current-mode-text">Chat</span>
-                                <i class="codicon codicon-chevron-down"></i>
+                    <!-- Textarea for user input -->
+                    <textarea id="user-input" placeholder="Ask Codexpilot"></textarea>
+
+                    <!-- Action buttons row inside the main input area -->
+                    <div id="action-button-row">
+                        <div id="action-buttons-left">
+                            <!-- Mode Picker Button -->
+                            <div id="mode-picker-container">
+                                <button id="mode-picker-button" class="mode-button" title="Select Mode">
+                                    <i class="codicon codicon-comment-discussion"></i>
+                                    <span id="current-mode-text">Chat</span>
+                                    <i class="codicon codicon-chevron-down"></i>
+                                </button>
+                                <!-- Dropdown menu - initially hidden -->
+                                <ul id="mode-dropdown" class="mode-dropdown">
+                                    <li><button data-mode="chat"><i class="codicon codicon-comment-discussion"></i> Chat</button></li>
+                                    <li><button data-mode="agent" title="Coming Soon!"><i class="codicon codicon-robot"></i> Agent <span class="soon-tag">Soon</span></button></li>
+                                </ul>
+                            </div>
+                            <!-- Context Add Button -->
+                            <button id="context-add-button" title="Add File Context">
+                                <i class="codicon codicon-mention"></i>
                             </button>
-                            <!-- Dropdown menu - initially hidden -->
-                            <ul id="mode-dropdown" class="mode-dropdown">
-                                <li><button data-mode="chat"><i class="codicon codicon-comment-discussion"></i> Chat</button></li>
-                                <li><button data-mode="agent" title="Coming Soon!"><i class="codicon codicon-robot"></i> Agent <span class="soon-tag">Soon</span></button></li>
-                            </ul>
                         </div>
-
-                        <!-- Context Add Button -->
-                        <button id="context-add-button" class="icon-button" title="Add Context File (@)">
-                            <i class="codicon codicon-mention"></i>
-                        </button>
+                        <div id="action-buttons-right">
+                            <!-- Send Button -->
+                            <button id="send-button" title="Send Message">
+                                <i class="codicon codicon-send"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
