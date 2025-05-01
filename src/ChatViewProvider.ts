@@ -707,7 +707,7 @@ If the user asks about code and there's no context provided, just answer based o
                     </div>
 
                     <!-- Textarea for user input -->
-                    <textarea id="user-input" placeholder="Ask Codexpilot"></textarea>
+                    <textarea id="user-input" placeholder="Ask Codexpilot..."></textarea>
 
                     <!-- Action buttons row inside the main input area -->
                     <div id="action-button-row">
