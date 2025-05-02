@@ -37,13 +37,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         };
     }
 
+    /**
+     * Called when the webview view is first created or becomes visible again after being hidden.
+     * This is the main initialization point for the webview UI.
+     *
+     * @param webviewView The webview view to configure
+     * @param _context Context containing information about the resolve operation
+     * @param _token Cancellation token for the resolve operation
+     */
     public resolveWebviewView(
         webviewView: vscode.WebviewView,
         _context: vscode.WebviewViewResolveContext,
         _token: vscode.CancellationToken,
     ) {
+        // Store a reference to the webview view for later use
         this._view = webviewView;
 
+        // Configure webview security options
         webviewView.webview.options = {
             // Enable JavaScript in the webview
             enableScripts: true,
@@ -51,55 +61,66 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             localResourceRoots: [this._extensionUri]
         };
 
-        // Set the HTML content
+        // Set the HTML content for the webview
         webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
 
-        // Handle messages from the webview
+        // Set up message handling from the webview
+        // This is the communication channel between the extension and the webview
         webviewView.webview.onDidReceiveMessage(async (message) => {
             console.log('Received message from webview:', message);
 
+            // Handle different message types with their corresponding handlers
             switch (message.type) {
                 case 'sendMessage':
+                    // User has sent a message/query to the AI
                     console.log('User message:', message.text);
                     await this.handleUserQuery(message.text);
                     break;
 
                 case 'searchWorkspaceFiles':
+                    // User is searching for files to add to context
                     console.log('Received searchWorkspaceFiles request with query:', message.query);
                     await this.handleFileSearch(message.query);
                     break;
 
                 case 'addFileToContextViaMention':
+                    // User has selected a file to add to context via @ mention
                     console.log('Received addFileToContextViaMention request with URI:', message.uriString);
                     await this.handleAddFileToContext(message.uriString);
                     break;
 
                 case 'insertCode':
+                    // User wants to insert code from a response into the editor
                     console.log('Received insertCode request with code length:', message.code.length);
                     await this.handleInsertCode(message.code);
                     break;
 
                 case 'removeFileFromContext':
+                    // User has removed a file from context (clicked X on a pill)
                     console.log('Received removeFileFromContext request with URI:', message.uriString);
                     await this.handleRemoveFileFromContext(message.uriString);
                     break;
 
                 case 'clearChat':
+                    // User wants to start a new chat
                     console.log('Received clearChat request');
                     await this.clearConversationAndContext();
                     break;
 
                 case 'showInfoMessage':
+                    // Show an information message in VS Code
                     console.log('Received showInfoMessage request:', message.text);
                     vscode.window.showInformationMessage(message.text);
                     break;
 
                 case 'showHistory':
+                    // User wants to view chat history
                     console.log('Received showHistory request');
                     await this.showHistory();
                     break;
 
                 case 'getRecentFiles':
+                    // User wants to see recently opened files (for @ mentions)
                     console.log('Received getRecentFiles request');
                     await this.getRecentFiles();
                     break;
@@ -375,43 +396,46 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     /**
      * Load a chat from history
+     * This method restores a previously saved chat session including its conversation history and context files
+     *
      * @param chatId The ID of the chat to load
      */
     private async loadChatFromHistory(chatId: string): Promise<void> {
-        // Import the getChatSessionById function
+        // Import the necessary functions from extension.ts
         const { getChatSessionById, setActiveContextUris } = require('./extension');
 
-        // Get the chat session
+        // Retrieve the saved chat session by its ID
         const sessionToLoad = getChatSessionById(this._context, chatId);
 
-        // Check if the session exists
+        // Verify the session exists
         if (!sessionToLoad) {
             vscode.window.showErrorMessage('Could not load selected chat session.');
             return;
         }
 
-        // Clear the current state without saving
+        // Clear the current UI and state without saving the current conversation
         await this.clearUiAndStateWithoutSaving();
 
-        // Set the chat ID
+        // Restore the chat ID
         this.currentChatId = sessionToLoad.id;
 
-        // Load the conversation history
+        // Restore the conversation history
         this.conversationHistory = sessionToLoad.conversationHistory;
 
-        // Load the context URIs
+        // Convert URI strings back to URI objects and restore context
         this._currentContextUris = sessionToLoad.contextUriStrings.map((uriString: string) => vscode.Uri.parse(uriString));
 
-        // Update the context file list in extension.ts
+        // Update the global context file list in extension.ts
         setActiveContextUris(this._currentContextUris);
 
-        // Update the webview UI
+        // Update the webview UI with the restored conversation history
         this.sendMessageToWebview({
             type: 'restoreChat',
             history: this.conversationHistory
         });
 
-        // Send paths for pills
+        // Restore the context pills in the UI
+        // We need to send both the display paths and the URI strings
         const contextPaths = this._currentContextUris.map(uri => vscode.workspace.asRelativePath(uri));
         this.sendMessageToWebview({
             type: 'restoreContextPills',
@@ -419,7 +443,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             contextUriStrings: sessionToLoad.contextUriStrings
         });
 
-        // Show success message
+        // Show a success message to the user
         vscode.window.showInformationMessage(`Loaded chat: ${sessionToLoad.title}`);
     }
 
@@ -519,21 +543,25 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     /**
      * Handle a user query by calling the Gemini API
+     * This is the core method that processes user messages and gets AI responses
+     *
      * @param userQuery The user's query text
      */
     private async handleUserQuery(userQuery: string): Promise<void> {
-        // Prevent multiple concurrent requests
+        // Prevent multiple concurrent requests to avoid race conditions
         if (this._isProcessingMessage) {
             console.log('Already processing a message, ignoring new request');
             return;
         }
 
+        // Set flag to indicate we're processing a message
         this._isProcessingMessage = true;
 
         try {
-            // Get the API key
+            // Get the API key from secure storage
             const apiKey = await getApiKey(this._context);
 
+            // If no API key is found, show an error and exit early
             if (!apiKey) {
                 this.sendMessageToWebview({
                     type: 'geminiError',
@@ -542,26 +570,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 return;
             }
 
-            // Get the context content
+            // Read the content of all files in the context
             const contextContent = await this.readContextFiles();
 
-            // Construct the system message
+            // Define the system message that sets the AI's behavior and tone
             const systemMessage = `You are a helpful coding assistant in an IDE. You help users understand and modify code.
 Be explanatory and clear in your explanations.
 When showing code examples, use proper formatting with markdown.
 If the user asks about code and there's no context provided, just answer based on your general knowledge.`;
 
-            // Determine if we have actual context files or just the default message
+            // Check if we have actual context files or just the default "no context" message
             const hasRealContext = contextContent !== "No context files provided.";
 
-            // If this is the first message in a new chat, generate a chat ID
+            // Generate a new chat ID if this is the first message in a new conversation
             if (this.conversationHistory.length === 0 && !this.currentChatId) {
                 this.currentChatId = Date.now().toString();
                 console.log(`Started new chat with ID: ${this.currentChatId}`);
             }
 
             // Add the user's message to the conversation history
-            // If this is the first message and we have context, include the context in the message
+            // For the first message with context, we include the file contents
             if (this.conversationHistory.length === 0 && hasRealContext) {
                 // For the first message, include context with the user query
                 this.conversationHistory.push({
@@ -578,16 +606,18 @@ If the user asks about code and there's no context provided, just answer based o
                 });
             }
 
-            // Send a thinking indicator
+            // Update UI to show the AI is thinking
             this.sendMessageToWebview({ type: 'geminiThinking' });
 
-            // Send a message to prepare the UI for streaming
+            // Prepare the UI for streaming response
             this.sendMessageToWebview({ type: 'geminiStreamStart' });
 
-            // Create a variable to accumulate the complete response
+            // Variable to accumulate the complete response for conversation history
             let completeResponseText = '';
 
-            // Call the Gemini API with streaming and conversation history
+            // Call the Gemini API with streaming enabled
+            // This sends the conversation history and system message to the API
+            // and processes the response in chunks for a better user experience
             await callGeminiApiStream(
                 apiKey,
                 this.conversationHistory,
@@ -596,7 +626,7 @@ If the user asks about code and there's no context provided, just answer based o
                     // Accumulate the complete response
                     completeResponseText += chunk;
 
-                    // Send each chunk to the webview
+                    // Send each chunk to the webview for real-time display
                     this.sendMessageToWebview({
                         type: 'geminiResponseChunk',
                         chunk: chunk
@@ -604,26 +634,27 @@ If the user asks about code and there's no context provided, just answer based o
                 }
             );
 
-            // Add the assistant's response to the conversation history
+            // Add the assistant's complete response to the conversation history
             this.conversationHistory.push({
                 role: 'model',
                 parts: [{ text: completeResponseText }]
             });
 
-            // Trim history if it exceeds the maximum length
+            // Trim history if it exceeds the maximum length to manage token usage
             if (this.conversationHistory.length > this.MAX_HISTORY_LENGTH) {
                 this.conversationHistory = this.conversationHistory.slice(-this.MAX_HISTORY_LENGTH);
             }
 
             console.log(`Conversation history now has ${this.conversationHistory.length} messages`);
 
-            // Send a message to indicate the stream has ended
+            // Signal the webview that the stream has ended
             this.sendMessageToWebview({ type: 'geminiStreamEnd' });
 
         } catch (error: any) {
+            // Log and handle any errors that occur during processing
             console.error('Error handling user query:', error);
 
-            // Send the error
+            // Send the error message to the webview
             this.sendMessageToWebview({
                 type: 'geminiError',
                 text: error.message || 'An unknown error occurred'
@@ -632,7 +663,7 @@ If the user asks about code and there's no context provided, just answer based o
             // Also send stream end to clean up UI state if needed
             this.sendMessageToWebview({ type: 'geminiStreamEnd' });
         } finally {
-            // Reset the processing flag
+            // Always reset the processing flag when done
             this._isProcessingMessage = false;
 
             // Notify the webview that processing is complete

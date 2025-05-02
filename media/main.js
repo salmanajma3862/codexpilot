@@ -188,34 +188,34 @@
         // This will match @word, @word.ext, @path/file, etc. but not @word followed by a space
         const atMatch = textBeforeCursor.match(/@([^\s]*)$/);
 
-        console.log('Input change detected:', {
-            text,
-            cursorPosition,
-            textBeforeCursor,
-            atMatch
-        });
+        // console.log('Input change detected:', {
+        //     text,
+        //     cursorPosition,
+        //     textBeforeCursor,
+        //     atMatch
+        // });
 
         if (atMatch) {
             // The query is the text after the @ symbol
             const query = atMatch[1]; // Group 1 from the regex match (text after @)
             const atIndex = atMatch.index; // Position of the @ symbol
 
-            console.log('@ pattern detected! Query:', query, 'at position:', atIndex);
+            // console.log('@ pattern detected! Query:', query, 'at position:', atIndex);
 
             // If the query is empty (just @), show recent files
             if (!query) {
-                console.log('Empty query, showing recent files');
+                // console.log('Empty query, showing recent files');
                 currentSearchQuery = '';
                 showRecentFiles();
             }
             // If the query is not empty and different from the current search
             else if (query !== currentSearchQuery) {
-                console.log('New search query detected:', query);
+                // console.log('New search query detected:', query);
                 currentSearchQuery = query;
                 searchFiles(query);
             }
         } else {
-            console.log('No @ pattern detected or not at word boundary, hiding search results');
+            // console.log('No @ pattern detected or not at word boundary, hiding search results');
             // If there's no @ symbol before the cursor, hide the search results
             hideFileSearch();
         }
@@ -223,7 +223,7 @@
 
     // Function to show recent files
     function showRecentFiles() {
-        console.log('Showing recent files');
+        // console.log('Showing recent files');
 
         // Show loading indicator
         showFileSearchLoading();
@@ -233,20 +233,20 @@
             type: 'getRecentFiles'
         };
 
-        console.log('Sending message to extension:', message);
+        // console.log('Sending message to extension:', message);
         vscode.postMessage(message);
     }
 
     // Function to search for files
     function searchFiles(query) {
-        console.log('Searching files with query:', query);
+        // console.log('Searching files with query:', query);
 
         // Log special characters if present to help with debugging
         if (query.includes('.') || query.includes('/') || query.includes('\\')) {
-            console.log('Query contains special characters:',
-                        query.includes('.') ? 'dot' : '',
-                        query.includes('/') ? 'forward-slash' : '',
-                        query.includes('\\') ? 'backslash' : '');
+            // console.log('Query contains special characters:',
+            //             query.includes('.') ? 'dot' : '',
+            //             query.includes('/') ? 'forward-slash' : '',
+            //             query.includes('\\') ? 'backslash' : '');
         }
 
         // Show loading indicator
@@ -258,13 +258,13 @@
             query: query
         };
 
-        console.log('Sending message to extension:', message);
+        // console.log('Sending message to extension:', message);
         vscode.postMessage(message);
     }
 
     // Function to show loading indicator
     function showFileSearchLoading() {
-        console.log('Showing file search loading indicator');
+        // console.log('Showing file search loading indicator');
         isSearching = true;
         fileSearchContainer.style.display = 'block';
         fileSearchContainer.innerHTML = '<div class="loading">Searching files...</div>';
@@ -275,14 +275,14 @@
         // Ensure proper styling
         fileSearchContainer.style.border = '1px solid var(--vscode-editorWidget-border, var(--vscode-input-border))';
 
-        console.log('File search container:', {
-            display: fileSearchContainer.style.display,
-            position: fileSearchContainer.style.position,
-            top: fileSearchContainer.style.top,
-            left: fileSearchContainer.style.left,
-            width: fileSearchContainer.style.width,
-            height: fileSearchContainer.style.height
-        });
+        // console.log('File search container:', {
+        //     display: fileSearchContainer.style.display,
+        //     position: fileSearchContainer.style.position,
+        //     top: fileSearchContainer.style.top,
+        //     left: fileSearchContainer.style.left,
+        //     width: fileSearchContainer.style.width,
+        //     height: fileSearchContainer.style.height
+        // });
     }
 
     // Function to hide file search
@@ -294,7 +294,7 @@
 
     // Function to position the file search container
     function positionFileSearchContainer() {
-        console.log('Positioning file search container');
+        // console.log('Positioning file search container');
 
         // Get the input area position
         const inputAreaRect = document.getElementById('input-area').getBoundingClientRect();
