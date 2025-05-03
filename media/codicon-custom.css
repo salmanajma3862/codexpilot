@@ -20,16 +20,4 @@
     vertical-align: middle;
 }
 
-/* Specific Codicon Character Definitions for commonly used icons */
-.codicon-add::before { content: '\ea60'; }
-.codicon-beaker::before { content: '\ea79'; }
-.codicon-history::before { content: '\eafc'; }
-.codicon-settings-gear::before { content: '\eb51'; }
-.codicon-comment-discussion::before { content: '\ea7b'; }
-.codicon-chevron-down::before { content: '\eab4'; }
-.codicon-mention::before { content: '\eb99'; }
-.codicon-send::before { content: '\eb49'; }
-.codicon-robot::before { content: '\eb44'; }
-.codicon-copy::before { content: '\eaaf'; }
-.codicon-check::before { content: '\eab2'; }
-.codicon-close::before { content: '\ea76'; }
+/* Note: Removed specific character definitions to rely on the original codicon.css */

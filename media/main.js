@@ -457,7 +457,12 @@
         // Create the close button
         const closeButton = document.createElement('button');
         closeButton.className = 'pill-close-button';
-        closeButton.textContent = '×';
+
+        // Use Codicon for close button
+        const closeIcon = document.createElement('i');
+        closeIcon.className = 'codicon codicon-close';
+        closeButton.appendChild(closeIcon);
+
         closeButton.title = 'Remove from context';
 
         // Add event listener to close button
