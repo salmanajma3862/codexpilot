@@ -118,28 +118,37 @@ export async function callGeminiApiStream(
             systemInstructionOrCallback :
             undefined;
 
+        // Log the received contents for API call
+        if (isUsingHistory) {
+            console.log('>>> GeminiAPI: Received contents for API call:', JSON.stringify(promptOrHistory, null, 2));
+        } else {
+            console.log('>>> GeminiAPI: Received simple prompt string (not conversation history)');
+        }
+
         // Generate content stream based on input type
         let result;
 
         if (isUsingHistory) {
             // Using conversation history
-            console.log(`Using conversation history with ${promptOrHistory.length} messages`);
+            console.log(`>>> GeminiAPI: Using conversation history with ${(promptOrHistory as any[]).length} messages`);
 
             if (systemInstruction) {
                 // With system instruction
+                console.log('>>> GeminiAPI: Including system instruction:', systemInstruction);
                 result = await model.generateContentStream({
                     contents: promptOrHistory,
                     systemInstruction: systemInstruction
                 });
             } else {
                 // Without system instruction
+                console.log('>>> GeminiAPI: No system instruction provided');
                 result = await model.generateContentStream({
                     contents: promptOrHistory
                 });
             }
         } else {
             // Using simple prompt string
-            console.log("Using simple prompt string");
+            console.log(">>> GeminiAPI: Using simple prompt string");
             result = await model.generateContentStream(promptOrHistory as string);
         }
 

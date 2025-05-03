@@ -209,8 +209,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 console.log('>>> Updated local context URIs:', this._currentContextUris.map(u => u.toString()));
 
                 // Clear conversation history when context changes
+                console.log('>>> Context Change: About to clear conversation history due to adding file');
+                console.log(`>>> Context Change: Before clearing, history had ${this.conversationHistory.length} messages`);
                 this.clearConversationHistory();
-                console.log('>>> Conversation history cleared due to context change');
+                console.log('>>> Context Change: Conversation history cleared due to context change');
 
                 // Send a success response back to the webview
                 this.sendMessageToWebview({
@@ -243,8 +245,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
      * This should be called when the context changes
      */
     private clearConversationHistory() {
-        console.log('Clearing conversation history');
+        console.log('>>> History: CLEARING conversation history!');
+        console.log(`>>> History: Before clearing, history had ${this.conversationHistory.length} messages`);
         this.conversationHistory = [];
+        console.log('>>> History: After clearing, history is empty');
     }
 
     /**
@@ -259,9 +263,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.currentChatId = Date.now().toString();
 
         // Clear conversation history
+        console.log('>>> New Chat: About to clear conversation history due to new chat button');
+        console.log(`>>> New Chat: Before clearing, history had ${this.conversationHistory.length} messages`);
         this.clearConversationHistory();
 
         // Clear context files using the centralized state management function
+        console.log('>>> New Chat: Clearing context files');
         clearContextUris();
 
         // Update our local copy of the context URIs
@@ -454,7 +461,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         this.currentChatId = sessionToLoad.id;
 
         // Restore the conversation history
+        console.log(`>>> Load History: Restoring conversation history with ${sessionToLoad.conversationHistory.length} messages`);
         this.conversationHistory = sessionToLoad.conversationHistory;
+        console.log('>>> Load History: First message in restored history:',
+            sessionToLoad.conversationHistory.length > 0 ?
+            JSON.stringify(sessionToLoad.conversationHistory[0]) : 'No messages');
+        console.log('>>> Load History: Last message in restored history:',
+            sessionToLoad.conversationHistory.length > 0 ?
+            JSON.stringify(sessionToLoad.conversationHistory[sessionToLoad.conversationHistory.length - 1]) : 'No messages');
 
         // Process each URI string from the saved session
         if (sessionToLoad.contextUriStrings && Array.isArray(sessionToLoad.contextUriStrings)) {
@@ -500,9 +514,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
      */
     private async clearUiAndStateWithoutSaving(): Promise<void> {
         // Clear conversation history
+        console.log('>>> Load History: About to clear conversation history before loading from history');
+        console.log(`>>> Load History: Before clearing, history had ${this.conversationHistory.length} messages`);
         this.conversationHistory = [];
+        console.log('>>> Load History: Conversation history cleared');
 
         // Clear context files using the centralized state management function
+        console.log('>>> Load History: Clearing context files');
         clearContextUris();
 
         // Update our local copy of the context URIs
@@ -534,8 +552,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                 console.log('>>> Updated local context URIs:', this._currentContextUris.map(u => u.toString()));
 
                 // Clear conversation history when context changes
+                console.log('>>> Context Change: About to clear conversation history due to removing file');
+                console.log(`>>> Context Change: Before clearing, history had ${this.conversationHistory.length} messages`);
                 this.clearConversationHistory();
-                console.log('>>> Conversation history cleared due to context change');
+                console.log('>>> Context Change: Conversation history cleared due to context change');
             } else {
                 console.log('>>> Failed to remove file from global context');
             }
@@ -642,12 +662,16 @@ If the user asks about code and there's no context provided, just answer based o
                         text: `CONTEXT FILES:\n${contextContent}\n\nUSER QUERY:\n${userQuery}`
                     }]
                 });
+                console.log(`>>> History: Added USER message with context. History length: ${this.conversationHistory.length}`,
+                    this.conversationHistory.slice(-5)); // Log last 5 items
             } else {
                 // For subsequent messages, just add the user query
                 this.conversationHistory.push({
                     role: 'user',
                     parts: [{ text: userQuery }]
                 });
+                console.log(`>>> History: Added USER message. History length: ${this.conversationHistory.length}`,
+                    this.conversationHistory.slice(-5)); // Log last 5 items
             }
 
             // Update UI to show the AI is thinking
@@ -659,12 +683,25 @@ If the user asks about code and there's no context provided, just answer based o
             // Variable to accumulate the complete response for conversation history
             let completeResponseText = '';
 
+            // Prepare the history for the API call
+            const historyForApi = this.conversationHistory.slice(-this.MAX_HISTORY_LENGTH);
+
+            console.log(`>>> History: Preparing API call. Sending ${historyForApi.length} turns.`);
+
+            // Log the first turn if history exists
+            if (historyForApi.length > 1) {
+                console.log('>>> History: First turn being sent:', JSON.stringify(historyForApi[0]));
+            }
+
+            // Log the last turn being sent for verification
+            console.log('>>> History: Last turn being sent:', JSON.stringify(historyForApi.slice(-1)[0]));
+
             // Call the Gemini API with streaming enabled
             // This sends the conversation history and system message to the API
             // and processes the response in chunks for a better user experience
             await callGeminiApiStream(
                 apiKey,
-                this.conversationHistory,
+                historyForApi, // Use the prepared history
                 systemMessage,
                 (chunk: string) => {
                     // Accumulate the complete response
@@ -683,10 +720,15 @@ If the user asks about code and there's no context provided, just answer based o
                 role: 'model',
                 parts: [{ text: completeResponseText }]
             });
+            console.log(`>>> History: Added MODEL message. History length: ${this.conversationHistory.length}`,
+                this.conversationHistory.slice(-5)); // Log last 5 items
 
             // Trim history if it exceeds the maximum length to manage token usage
             if (this.conversationHistory.length > this.MAX_HISTORY_LENGTH) {
+                console.log(`>>> History: Trimming history from ${this.conversationHistory.length} to ${this.MAX_HISTORY_LENGTH}`);
                 this.conversationHistory = this.conversationHistory.slice(-this.MAX_HISTORY_LENGTH);
+                console.log(`>>> History: After trimming, history length: ${this.conversationHistory.length}`,
+                    this.conversationHistory.slice(-5)); // Log last 5 items
             }
 
             console.log(`Conversation history now has ${this.conversationHistory.length} messages`);
