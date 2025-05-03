@@ -80,29 +80,114 @@ export function getChatSessionById(context: vscode.ExtensionContext, chatId: str
  */
 export function setActiveContextUris(uris: vscode.Uri[]): void {
     contextFileUris = [...uris];
-    updateContextInWebview();
+    syncContextStateToWebview();
 }
 
 /**
  * Get the current context file URIs
+ * @returns A copy of the current context URIs array
  */
 export function getContextFileUris(): vscode.Uri[] {
     return [...contextFileUris];
 }
 
 /**
- * Update the context files list in the webview
+ * Get a URI from the context by its string representation
+ * @param uriString The string representation of the URI to find
+ * @returns The URI object if found, undefined otherwise
  */
-function updateContextInWebview() {
-    if (chatProviderInstance) {
-        // Convert URIs to relative paths for display
-        const fileNames = contextFileUris.map(uri => vscode.workspace.asRelativePath(uri));
+export function getContextUriByString(uriString: string): vscode.Uri | undefined {
+    return contextFileUris.find(uri => uri.toString() === uriString);
+}
 
-        // Send the update to the webview
+/**
+ * Add a URI to the context if it doesn't already exist
+ * @param uri The URI to add to the context
+ * @returns True if the URI was added, false if it already existed or couldn't be added
+ */
+export function addUriToContext(uri: vscode.Uri): boolean {
+    // Check if the URI is already in the context
+    const uriString = uri.toString();
+    const isAlreadyInContext = contextFileUris.some(existingUri => existingUri.toString() === uriString);
+
+    if (isAlreadyInContext) {
+        console.log(`>>> URI already in context: ${uriString}`);
+        return false;
+    }
+
+    // Add the URI to the context
+    contextFileUris.push(uri);
+    console.log(`>>> Added URI to context: ${uriString}`);
+
+    // Sync the updated state to the webview
+    syncContextStateToWebview();
+
+    return true;
+}
+
+/**
+ * Remove a URI from the context by its string representation
+ * @param uriString The string representation of the URI to remove
+ * @returns True if the URI was removed, false if it wasn't found
+ */
+export function removeUriFromContext(uriString: string): boolean {
+    // Find the index of the URI to remove
+    const index = contextFileUris.findIndex(uri => uri.toString() === uriString);
+
+    if (index === -1) {
+        console.log(`>>> URI not found in context: ${uriString}`);
+        return false;
+    }
+
+    // Remove the URI from the context
+    contextFileUris.splice(index, 1);
+    console.log(`>>> Removed URI from context: ${uriString}`);
+
+    // Sync the updated state to the webview
+    syncContextStateToWebview();
+
+    return true;
+}
+
+/**
+ * Clear all URIs from the context
+ */
+export function clearContextUris(): void {
+    contextFileUris = [];
+    console.log('>>> Cleared all URIs from context');
+
+    // Sync the updated state to the webview
+    syncContextStateToWebview();
+}
+
+/**
+ * Sync the current context state to the webview
+ * This should be called after any modification to the contextFileUris array
+ */
+export function syncContextStateToWebview(): void {
+    console.log('>>> syncContextStateToWebview called');
+    console.log('>>> Current contextFileUris:', contextFileUris.map(uri => uri.toString()));
+
+    if (chatProviderInstance) {
+        // Prepare data for the webview
+        const contextPaths = contextFileUris.map(uri => vscode.workspace.asRelativePath(uri));
+        const contextUriStrings = contextFileUris.map(uri => uri.toString());
+
+        // Send a dedicated message to update the context pills
+        chatProviderInstance.sendMessageToWebview({
+            type: 'updateContextPills',
+            contextPaths: contextPaths,
+            contextUriStrings: contextUriStrings
+        });
+        console.log(`>>> State Sync: Sent updateContextPills to webview with ${contextPaths.length} files.`);
+
+        // Also send the legacy message for backward compatibility
         chatProviderInstance.sendMessageToWebview({
             type: 'contextUpdated',
-            files: fileNames
+            files: contextPaths
         });
+    } else {
+        console.log('>>> chatProviderInstance is null, cannot update webview');
     }
 }
 
@@ -116,18 +201,8 @@ export async function addFileToContext(fileUri: vscode.Uri): Promise<boolean> {
         // Check if it's a file (not a directory)
         const stat = await vscode.workspace.fs.stat(fileUri);
         if (stat.type === vscode.FileType.File) {
-            // Check if the file is already in the context
-            const fileUriString = fileUri.toString();
-            const isAlreadyInContext = contextFileUris.some(uri => uri.toString() === fileUriString);
-
-            if (!isAlreadyInContext) {
-                // Add the file to the context
-                contextFileUris.push(fileUri);
-
-                // Update the webview
-                updateContextInWebview();
-                return true;
-            }
+            // Use the new addUriToContext function
+            return addUriToContext(fileUri);
         }
         return false;
     } catch (error) {
@@ -140,8 +215,8 @@ export async function addFileToContext(fileUri: vscode.Uri): Promise<boolean> {
  * Clear all files from the context
  */
 export function clearContext() {
-    contextFileUris = [];
-    updateContextInWebview();
+    // Use the new clearContextUris function
+    clearContextUris();
 }
 
 /**
@@ -151,23 +226,8 @@ export function clearContext() {
  */
 export async function removeFileFromContext(fileUri: vscode.Uri): Promise<boolean> {
     try {
-        // Check if the file is in the context
-        const fileUriString = fileUri.toString();
-        const index = contextFileUris.findIndex(uri => uri.toString() === fileUriString);
-
-        if (index === -1) {
-            console.log(`File ${fileUri.fsPath} is not in the context`);
-            return false;
-        }
-
-        // Remove the file from the context
-        contextFileUris.splice(index, 1);
-        console.log(`Removed file ${fileUri.fsPath} from the context`);
-
-        // Update the context in the webview
-        updateContextInWebview();
-
-        return true;
+        // Use the new removeUriFromContext function
+        return removeUriFromContext(fileUri.toString());
     } catch (error) {
         console.error(`Error removing file ${fileUri.fsPath} from the context:`, error);
         return false;

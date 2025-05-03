@@ -425,10 +425,11 @@
             // Set cursor position where the @ was
             userInputElement.setSelectionRange(atIndex, atIndex);
 
-            // Create a context pill for the file
-            createContextPill(file);
+            // Log the file selection
+            console.log(`>>> File Selected: ${file.path}, URI: ${file.uriString}`);
 
             // Add the file to the context in the backend
+            // The backend will handle updating the UI via updateContextPills
             vscode.postMessage({
                 type: 'addFileToContextViaMention',
                 uriString: file.uriString
@@ -444,6 +445,28 @@
 
     // Function to create a context pill
     function createContextPill(file) {
+        console.log('>>> Create Context Pill: Called with file:', file);
+
+        // Validate file object
+        if (!file || typeof file !== 'object') {
+            console.error('>>> Create Context Pill: Invalid file object:', file);
+            return;
+        }
+
+        // Validate file path
+        if (!file.path || typeof file.path !== 'string' || file.path.trim() === '') {
+            console.error('>>> Create Context Pill: Invalid or empty file path:', file);
+            return;
+        }
+
+        // Validate URI string
+        if (!file.uriString || typeof file.uriString !== 'string' || file.uriString.trim() === '') {
+            console.error('>>> Create Context Pill: Invalid or empty URI string:', file);
+            return;
+        }
+
+        console.log(`>>> Create Context Pill: Creating pill for path: ${file.path}, URI: ${file.uriString}`);
+
         // Create the pill element
         const pill = document.createElement('div');
         pill.className = 'context-pill';
@@ -468,6 +491,24 @@
         // Add event listener to close button
         closeButton.addEventListener('click', (e) => {
             e.preventDefault();
+
+            console.log(`>>> Pill Close Button: Click detected on pill with URI: ${pill.dataset.uri}`);
+
+            // Validate the pill element before passing to removeContextPill
+            if (!pill || !pill.parentNode) {
+                console.error('>>> Pill Close Button: Pill element is invalid or already removed from DOM');
+                return;
+            }
+
+            // Validate the URI string
+            if (!pill.dataset.uri || pill.dataset.uri.trim() === '') {
+                console.error('>>> Pill Close Button: Pill has invalid or empty URI string:', pill);
+                // Still remove the pill from the DOM to prevent UI inconsistency
+                pill.remove();
+                return;
+            }
+
+            // Call removeContextPill with the validated pill
             removeContextPill(pill);
         });
 
@@ -477,14 +518,37 @@
 
         // Add the pill to the context pills container
         contextPillsElement.appendChild(pill);
+
+        // Force browser reflow - reading offsetHeight is a common trick
+        console.log('>>> Pill Render Fix: Pill appended to DOM. Forcing reflow...');
+        const forcedHeight = pill.offsetHeight;
+        console.log('>>> Pill Render Fix: Read offsetHeight (forced reflow):', forcedHeight);
     }
 
     // Function to remove a context pill
     function removeContextPill(pill) {
-        const uriString = pill.dataset.uri;
+        // Validate the pill parameter
+        if (!pill || !(pill instanceof Element) || !pill.classList.contains('context-pill')) {
+            console.error('>>> Pill Remove: Invalid pill element provided:', pill);
+            return;
+        }
 
-        // Remove the pill from the DOM
-        pill.remove();
+        // Get the URI string from the pill's dataset
+        const uriString = pill.dataset.uri;
+        console.log(`>>> Pill Remove: Getting URI string from pill:`, uriString);
+
+        // Validate the URI string
+        if (!uriString || uriString.trim() === '') {
+            console.error(`>>> Pill Remove: Invalid or empty URI string found in pill:`, pill);
+            // Still remove the pill from the DOM to prevent UI inconsistency
+            pill.remove();
+            console.log(`>>> Pill Remove: Removed invalid pill element from DOM without sending message`);
+            return;
+        }
+
+        // We no longer remove the pill from the DOM here
+        // The backend will handle updating the UI via updateContextPills
+        console.log(`>>> Pill Remove: Sending removeFileFromContext for ${uriString}`);
 
         // Send message to extension to remove the file from context
         vscode.postMessage({
@@ -505,10 +569,23 @@
                 // Store the files but don't update UI (pills are managed directly)
                 contextFiles = message.files;
                 break;
+            case 'updateContextPills':
+                console.log('>>> Handling updateContextPills with paths:', message.contextPaths);
+                console.log('>>> URI strings:', message.contextUriStrings);
+
+                // This is the new centralized way to update context pills
+                // We completely rebuild the pills based on the backend state
+                updateContextPillsFromBackend(message.contextPaths, message.contextUriStrings);
+                break;
+
             case 'contextUpdated':
-                console.log('Handling contextUpdated with files:', message.files);
-                // Store the files but don't update UI (pills are managed directly)
+                console.log('>>> Handling legacy contextUpdated with files:', message.files);
+                // Store the files for backward compatibility
                 contextFiles = message.files;
+
+                // Log the current pills in the DOM for debugging
+                const currentPills = Array.from(contextPillsElement.children);
+                console.log('>>> Current pills in DOM:', currentPills.map(pill => pill.dataset.uri));
                 break;
             case 'addChatMessage':
                 console.log('Handling addChatMessage:', message);
@@ -811,21 +888,23 @@
 
     // Function to sync context pills with backend state (used when loading state)
     function syncContextPills(files) {
-        console.log('Syncing context pills with files:', files);
+        console.log('>>> Sync Context Pills: Called with files:', files);
+        console.log('>>> Sync Context Pills: WARNING - This function is deprecated');
+        console.log('>>> Sync Context Pills: The backend should use updateContextPills instead');
 
-        // Clear existing pills
-        contextPillsElement.innerHTML = '';
+        // Validate files array
+        if (!files || !Array.isArray(files)) {
+            console.error('>>> Sync Context Pills: Invalid files array:', files);
+            return;
+        }
 
-        // Create pills for each file
-        files.forEach(filePath => {
-            // Create a mock file object for the pill
-            const file = {
-                path: filePath,
-                uriString: '' // We don't have the URI string when loading from state
-            };
-
-            createContextPill(file);
+        // Instead of creating pills directly, send a message to the backend
+        // to get the proper URI strings and then update the pills
+        vscode.postMessage({
+            type: 'requestContextUpdate'
         });
+
+        console.log('>>> Sync Context Pills: Requested context update from backend');
     }
 
     function clearChat() {
@@ -940,26 +1019,71 @@
     }
 
     /**
+     * Update context pills from backend state
+     * This is the centralized function to update the UI based on the backend state
+     * @param {Array} contextPaths The paths of the context files
+     * @param {Array} contextUriStrings The URI strings of the context files
+     */
+    function updateContextPillsFromBackend(contextPaths, contextUriStrings) {
+        console.log('>>> Update Context Pills: Starting with paths:', contextPaths);
+        console.log('>>> Update Context Pills: URI strings:', contextUriStrings);
+
+        // Clear existing pills - this is critical for proper synchronization
+        contextPillsElement.innerHTML = '';
+        console.log('>>> Update Context Pills: Cleared existing pills');
+
+        // Create pills for each file
+        if (contextPaths && contextPaths.length > 0) {
+            // Ensure contextUriStrings is an array
+            if (!Array.isArray(contextUriStrings)) {
+                console.error('>>> Update Context Pills: contextUriStrings is not an array:', contextUriStrings);
+                contextUriStrings = [];
+            }
+
+            // Create pills only for valid entries
+            contextPaths.forEach((path, index) => {
+                // Skip if path is empty
+                if (!path || path.trim() === '') {
+                    console.warn(`>>> Update Context Pills: Skipping empty path at index ${index}`);
+                    return;
+                }
+
+                // Get the URI string for this path
+                const uriString = contextUriStrings[index] || '';
+
+                // Skip if URI string is empty
+                if (!uriString || uriString.trim() === '') {
+                    console.warn(`>>> Update Context Pills: Skipping path with empty URI string: ${path}`);
+                    return;
+                }
+
+                console.log(`>>> Update Context Pills: Creating pill for path: ${path}, URI: ${uriString}`);
+
+                // Create a file object for the pill
+                const file = {
+                    path: path,
+                    uriString: uriString
+                };
+
+                // Create the pill
+                createContextPill(file);
+            });
+
+            console.log(`>>> Update Context Pills: Created ${contextPaths.length} pills`);
+        } else {
+            console.log('>>> Update Context Pills: No paths to display');
+        }
+    }
+
+    /**
      * Restore context pills from history
      * @param {Array} contextPaths The paths of the context files
      * @param {Array} contextUriStrings The URI strings of the context files
      */
     function restoreContextPills(contextPaths, contextUriStrings) {
-        // Clear existing pills
-        contextPillsElement.innerHTML = '';
-
-        // Create pills for each file
-        if (contextPaths && contextPaths.length > 0) {
-            contextPaths.forEach((path, index) => {
-                // Create a file object for the pill
-                const file = {
-                    path: path,
-                    uriString: contextUriStrings[index] || ''
-                };
-
-                createContextPill(file);
-            });
-        }
+        console.log('>>> Restore Context Pills: Delegating to updateContextPillsFromBackend');
+        // Use the centralized function to update the pills
+        updateContextPillsFromBackend(contextPaths, contextUriStrings);
     }
 
     // Function to show thinking indicator

@@ -1,6 +1,12 @@
 import * as vscode from 'vscode';
 import { callGeminiApiStream } from './geminiApi';
-import { getApiKey, getContextFileUris } from './extension';
+import {
+    getApiKey,
+    getContextFileUris,
+    removeUriFromContext,
+    addUriToContext,
+    clearContextUris
+} from './extension';
 import { ChatMessage, SavedChatSession } from './interfaces';
 
 // Interface for context management functions
@@ -125,6 +131,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                     await this.getRecentFiles();
                     break;
 
+                case 'requestContextUpdate':
+                    // Frontend is requesting a context update
+                    console.log('>>> Received requestContextUpdate');
+                    this.sendContextUpdateToWebview();
+                    break;
+
                 default:
                     console.log('Unhandled message type:', message.type);
             }
@@ -176,26 +188,48 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
      */
     private async handleAddFileToContext(uriString: string) {
         try {
+            console.log('>>> handleAddFileToContext called with URI:', uriString);
+
+            if (!uriString || uriString.trim() === '') {
+                console.error('>>> Invalid or empty URI string provided');
+                return;
+            }
+
             // Convert the URI string back to a URI
             const uri = vscode.Uri.parse(uriString);
 
-            // Add the file to the context
-            const added = await this._contextManagement.addFileToContext(uri);
+            // Use the centralized state management function
+            const added = addUriToContext(uri);
 
-            // Update our local copy of the context URIs
-            this._currentContextUris = getContextFileUris();
+            if (added) {
+                console.log('>>> File successfully added to global context');
 
-            // Clear conversation history when context changes
-            this.clearConversationHistory();
+                // Update our local copy of the context URIs
+                this._currentContextUris = getContextFileUris();
+                console.log('>>> Updated local context URIs:', this._currentContextUris.map(u => u.toString()));
 
-            // Send a response back to the webview
-            this.sendMessageToWebview({
-                type: 'fileAddedToContext',
-                success: added,
-                path: added ? vscode.workspace.asRelativePath(uri) : null
-            });
+                // Clear conversation history when context changes
+                this.clearConversationHistory();
+                console.log('>>> Conversation history cleared due to context change');
+
+                // Send a success response back to the webview
+                this.sendMessageToWebview({
+                    type: 'fileAddedToContext',
+                    success: true,
+                    path: vscode.workspace.asRelativePath(uri)
+                });
+            } else {
+                console.log('>>> Failed to add file to global context (already exists or invalid)');
+
+                // Send a failure response back to the webview
+                this.sendMessageToWebview({
+                    type: 'fileAddedToContext',
+                    success: false,
+                    error: 'File already in context or invalid'
+                });
+            }
         } catch (error) {
-            console.error('Error adding file to context:', error);
+            console.error('>>> Error adding file to context:', error);
             this.sendMessageToWebview({
                 type: 'fileAddedToContext',
                 success: false,
@@ -227,13 +261,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Clear conversation history
         this.clearConversationHistory();
 
-        // Clear context files
+        // Clear context files using the centralized state management function
+        clearContextUris();
+
+        // Update our local copy of the context URIs
         this._currentContextUris = [];
 
-        // Call the clearContext command to clear the global context state
-        await vscode.commands.executeCommand('codexpilot.clearContext');
-
-        console.log('Chat and context cleared via webview button');
+        console.log('>>> Chat and context cleared via webview button');
     }
 
     /**
@@ -402,7 +436,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
      */
     private async loadChatFromHistory(chatId: string): Promise<void> {
         // Import the necessary functions from extension.ts
-        const { getChatSessionById, setActiveContextUris } = require('./extension');
+        const { getChatSessionById } = require('./extension');
 
         // Retrieve the saved chat session by its ID
         const sessionToLoad = getChatSessionById(this._context, chatId);
@@ -422,11 +456,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Restore the conversation history
         this.conversationHistory = sessionToLoad.conversationHistory;
 
-        // Convert URI strings back to URI objects and restore context
-        this._currentContextUris = sessionToLoad.contextUriStrings.map((uriString: string) => vscode.Uri.parse(uriString));
+        // Process each URI string from the saved session
+        if (sessionToLoad.contextUriStrings && Array.isArray(sessionToLoad.contextUriStrings)) {
+            console.log(`>>> Loading ${sessionToLoad.contextUriStrings.length} context files from history`);
 
-        // Update the global context file list in extension.ts
-        setActiveContextUris(this._currentContextUris);
+            // Convert URI strings back to URI objects
+            for (const uriString of sessionToLoad.contextUriStrings) {
+                if (uriString && uriString.trim() !== '') {
+                    const uri = vscode.Uri.parse(uriString);
+                    // Add to the central state using our state management function
+                    addUriToContext(uri);
+                }
+            }
+
+            // Update our local copy after all URIs have been added
+            this._currentContextUris = getContextFileUris();
+            console.log(`>>> Loaded ${this._currentContextUris.length} context files from history`);
+        }
 
         // Update the webview UI with the restored conversation history
         this.sendMessageToWebview({
@@ -437,10 +483,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Restore the context pills in the UI
         // We need to send both the display paths and the URI strings
         const contextPaths = this._currentContextUris.map(uri => vscode.workspace.asRelativePath(uri));
+        const contextUriStrings = this._currentContextUris.map(uri => uri.toString());
         this.sendMessageToWebview({
             type: 'restoreContextPills',
             contextPaths: contextPaths,
-            contextUriStrings: sessionToLoad.contextUriStrings
+            contextUriStrings: contextUriStrings
         });
 
         // Show a success message to the user
@@ -455,13 +502,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         // Clear conversation history
         this.conversationHistory = [];
 
-        // Clear context files
+        // Clear context files using the centralized state management function
+        clearContextUris();
+
+        // Update our local copy of the context URIs
         this._currentContextUris = [];
 
-        // Call the clearContext command to clear the global context state
-        await vscode.commands.executeCommand('codexpilot.clearContext');
-
-        console.log('Chat and context cleared for loading history');
+        console.log('>>> Chat and context cleared for loading history');
     }
 
     /**
@@ -469,34 +516,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
      */
     private async handleRemoveFileFromContext(uriString: string) {
         try {
-            // Convert the URI string back to a URI
-            const uri = vscode.Uri.parse(uriString);
+            console.log('>>> handleRemoveFileFromContext called with URI:', uriString);
 
-            // Get the current context URIs from extension.ts
-            const currentUris = getContextFileUris();
+            if (!uriString || uriString.trim() === '') {
+                console.error('>>> Invalid or empty URI string provided');
+                return;
+            }
 
-            // Find the URI to remove
-            const uriToRemove = currentUris.find(u => u.toString() === uriString);
+            // Use the centralized state management function
+            const removed = removeUriFromContext(uriString);
 
-            if (uriToRemove) {
-                // Import the removeFileFromContext function from extension.ts
-                const { removeFileFromContext } = require('./extension');
-
-                // Remove the file from the context
-                await removeFileFromContext(uriToRemove);
+            if (removed) {
+                console.log('>>> File successfully removed from global context');
 
                 // Update our local copy of the context URIs
                 this._currentContextUris = getContextFileUris();
+                console.log('>>> Updated local context URIs:', this._currentContextUris.map(u => u.toString()));
 
                 // Clear conversation history when context changes
                 this.clearConversationHistory();
-
-                console.log('File removed from context:', vscode.workspace.asRelativePath(uri));
+                console.log('>>> Conversation history cleared due to context change');
             } else {
-                console.log('URI not found in context:', uriString);
+                console.log('>>> Failed to remove file from global context');
             }
         } catch (error) {
-            console.error('Error removing file from context:', error);
+            console.error('>>> Error removing file from context:', error);
         }
     }
 
@@ -700,6 +744,28 @@ If the user asks about code and there's no context provided, just answer based o
             console.error('Error inserting code:', error);
             vscode.window.showErrorMessage('Failed to insert code: ' + (error instanceof Error ? error.message : 'Unknown error'));
         }
+    }
+
+    /**
+     * Send a context update to the webview
+     * This method sends the current context URIs to the webview for UI synchronization
+     */
+    private sendContextUpdateToWebview(): void {
+        // Get the current context URIs
+        this._currentContextUris = getContextFileUris();
+
+        // Prepare the data for the webview
+        const contextPaths = this._currentContextUris.map(uri => vscode.workspace.asRelativePath(uri));
+        const contextUriStrings = this._currentContextUris.map(uri => uri.toString());
+
+        // Send the update to the webview
+        this.sendMessageToWebview({
+            type: 'updateContextPills',
+            contextPaths: contextPaths,
+            contextUriStrings: contextUriStrings
+        });
+
+        console.log(`>>> Sent context update to webview with ${contextPaths.length} files`);
     }
 
     /**
