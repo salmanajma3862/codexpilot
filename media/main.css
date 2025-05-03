@@ -177,9 +177,30 @@ body {
     opacity: 0.8;
 }
 
+.message-context-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.message .context-pill.readonly {
+    display: inline-block;
+    padding: 1px 5px;
+    font-size: 0.85em;
+    background-color: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    border-radius: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 150px;
+}
+
 .message-text {
     font-size: 14px;
     line-height: 1.5;
+    margin-top: 4px;
 }
 
 /* Specific styling for assistant message text elements */

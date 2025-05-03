@@ -679,8 +679,26 @@
     function sendMessage() {
         const text = userInputElement.value.trim();
         if (text) {
-            // Add message to UI
-            addChatMessage('user', text);
+            // Collect active context pills before sending the message
+            const activeContextFiles = [];
+            const pillElements = contextPillsElement.querySelectorAll('.context-pill');
+
+            console.log(`>>> Send Message: Found ${pillElements.length} active context pills`);
+
+            // Extract information from each pill
+            pillElements.forEach(pill => {
+                const filenameElement = pill.querySelector('.pill-filename');
+                if (filenameElement && filenameElement.textContent) {
+                    activeContextFiles.push({
+                        text: filenameElement.textContent,
+                        uri: pill.dataset.uri
+                    });
+                    console.log(`>>> Send Message: Added context file: ${filenameElement.textContent}`);
+                }
+            });
+
+            // Add message to UI with context files
+            addChatMessage('user', text, activeContextFiles);
 
             // Send message to extension
             vscode.postMessage({
@@ -696,7 +714,7 @@
         }
     }
 
-    function addChatMessage(sender, text) {
+    function addChatMessage(sender, text, contextFiles = []) {
         // Remove welcome message if it exists
         const welcomeMessage = chatHistoryElement.querySelector('.welcome-message');
         if (welcomeMessage) {
@@ -710,6 +728,34 @@
         const senderElement = document.createElement('div');
         senderElement.className = 'message-sender';
         senderElement.textContent = sender === 'user' ? 'You' : 'Assistant';
+
+        // Add context pills for user messages if they exist
+        if (sender === 'user' && contextFiles && contextFiles.length > 0) {
+            console.log(`>>> Add Chat Message: Adding ${contextFiles.length} context pills to user message`);
+
+            // Create container for context pills
+            const pillsContainer = document.createElement('div');
+            pillsContainer.className = 'message-context-pills';
+
+            // Add each context file as a readonly pill
+            contextFiles.forEach(file => {
+                const pillElement = document.createElement('span');
+                pillElement.className = 'context-pill readonly';
+                pillElement.textContent = file.text;
+                pillElement.title = file.text; // Add tooltip for full filename
+
+                // Store URI as data attribute if available
+                if (file.uri) {
+                    pillElement.dataset.uri = file.uri;
+                }
+
+                pillsContainer.appendChild(pillElement);
+                console.log(`>>> Add Chat Message: Added readonly pill for ${file.text}`);
+            });
+
+            // Add pills container to message
+            messageElement.appendChild(pillsContainer);
+        }
 
         const textElement = document.createElement('div');
         textElement.className = 'message-text';
@@ -859,10 +905,19 @@
         chatHistoryElement.appendChild(messageElement);
 
         // Add to chat history
-        chatHistory.push({
-            sender: sender,
-            text: text
-        });
+        // Store context files for user messages
+        if (sender === 'user' && contextFiles && contextFiles.length > 0) {
+            chatHistory.push({
+                sender: sender,
+                text: text,
+                contextFiles: contextFiles
+            });
+        } else {
+            chatHistory.push({
+                sender: sender,
+                text: text
+            });
+        }
 
         // Scroll to bottom
         chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
@@ -1007,7 +1062,28 @@
                 if (userText.includes('USER QUERY:')) {
                     userText = userText.split('USER QUERY:')[1].trim();
                 }
-                addChatMessage('user', userText);
+
+                // Check if we have context files in the message
+                // Note: This won't work for older history items that don't have contextFiles
+                // but will work for new messages saved with the updated format
+                const contextFiles = [];
+
+                // Get context files from the current context pills (for the first message)
+                // This is a fallback for older history items
+                if (contextFiles.length === 0 && message === history[0]) {
+                    const pillElements = contextPillsElement.querySelectorAll('.context-pill');
+                    pillElements.forEach(pill => {
+                        const filenameElement = pill.querySelector('.pill-filename');
+                        if (filenameElement && filenameElement.textContent) {
+                            contextFiles.push({
+                                text: filenameElement.textContent,
+                                uri: pill.dataset.uri
+                            });
+                        }
+                    });
+                }
+
+                addChatMessage('user', userText, contextFiles);
             } else if (message.role === 'model') {
                 // For model messages, render as assistant
                 addChatMessage('assistant', message.parts[0].text);
