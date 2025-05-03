@@ -719,20 +719,42 @@ If the user asks about code and there's no context provided, just answer based o
         const styleUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.css'));
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'media', 'main.js'));
 
-        // Create URI for the VS Code Codicons CSS
-        const codiconsUri = webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode/codicons', 'dist', 'codicon.css')
+        // Create URI for the Codicon font file (pointing to our copied version in dist/media)
+        const codiconFontUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'dist', 'media', 'codicon.ttf')
         );
+
+        // Create URI for the Codicon CSS file
+        const codiconCssUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'dist', 'media', 'codicon.css')
+        );
+
+        // Create URI for our custom Codicon CSS file
+        const codiconCustomCssUri = webview.asWebviewUri(
+            vscode.Uri.joinPath(this._extensionUri, 'dist', 'media', 'codicon-custom.css')
+        );
+
+        // Log for debugging during development
+        console.log("[Codicon Debug] Copied Font URI:", codiconFontUri.toString());
+        console.log("[Codicon Debug] Copied CSS URI:", codiconCssUri.toString());
+        console.log("[Codicon Debug] Custom CSS URI:", codiconCustomCssUri.toString());
 
         return `<!DOCTYPE html>
         <html lang="en">
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} https://cdnjs.cloudflare.com 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com; font-src ${webview.cspSource} https://cdnjs.cloudflare.com;">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} https://cdnjs.cloudflare.com 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com; font-src ${webview.cspSource} https://cdnjs.cloudflare.com data:;">
             <title>Codexpilot Chat</title>
+            <!-- Inline style for Codicon font path variable -->
+            <style nonce="${nonce}">
+                :root {
+                    --vscode-codicon-font-path: url('${codiconFontUri.toString()}');
+                }
+            </style>
             <link rel="stylesheet" type="text/css" href="${styleUri}">
-            <link rel="stylesheet" href="${codiconsUri}">
+            <link rel="stylesheet" href="${codiconCssUri}">
+            <link rel="stylesheet" href="${codiconCustomCssUri}">
             <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/vs2015.min.css">
             <style>
                 /* Custom styles for our UI elements */
@@ -855,6 +877,14 @@ If the user asks about code and there's no context provided, just answer based o
                     });
                 };
             </script>
+
+            <!-- Make font path available globally for debugging -->
+            <script nonce="${nonce}">
+                // Make font path available globally for main.js and debugging
+                window.codiconFontPath = '${codiconFontUri.toString()}';
+                console.log('Font Path set on window:', window.codiconFontPath);
+            </script>
+
             <script nonce="${nonce}" src="${scriptUri}"></script>
         </body>
         </html>`;
