@@ -358,8 +358,15 @@ export function activate(context: vscode.ExtensionContext) {
 
 		// Check if an API key was provided
 		if (apiKey) {
-			// Store the API key securely
-			await context.secrets.store(SECRET_STORAGE_KEY, apiKey);
+			// Basic validation - Gemini API keys are typically around 39 characters
+			const MIN_KEY_LENGTH = 35;
+			if (apiKey.trim().length < MIN_KEY_LENGTH) {
+				vscode.window.showErrorMessage('Codexpilot: Invalid API Key format. Key seems too short.');
+				return;
+			}
+
+			// Key looks potentially valid, store it (trimmed to remove any accidental whitespace)
+			await context.secrets.store(SECRET_STORAGE_KEY, apiKey.trim());
 			vscode.window.showInformationMessage('Codexpilot: API Key stored successfully.');
 		} else {
 			// User cancelled or didn't provide a key

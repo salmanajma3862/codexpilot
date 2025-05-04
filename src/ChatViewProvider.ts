@@ -852,7 +852,7 @@ If the user asks about code and there's no context provided, just answer based o
         <head>
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} https://cdnjs.cloudflare.com 'unsafe-inline'; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com; font-src ${webview.cspSource} https://cdnjs.cloudflare.com data:;">
+            <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com; font-src ${webview.cspSource} data:; connect-src https://generativelanguage.googleapis.com;">
             <title>Codexpilot Chat</title>
             <!-- Inline style for Codicon font path variable -->
             <style nonce="${nonce}">
@@ -863,8 +863,8 @@ If the user asks about code and there's no context provided, just answer based o
             <link rel="stylesheet" type="text/css" href="${styleUri}">
             <link rel="stylesheet" href="${codiconCssUri}">
             <link rel="stylesheet" href="${codiconCustomCssUri}">
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/vs2015.min.css">
-            <style>
+            <!-- Highlight.js styles are included in main.css -->
+            <style nonce="${nonce}">
                 /* Custom styles for our UI elements */
                 .code-button .codicon {
                     font-size: 14px;
