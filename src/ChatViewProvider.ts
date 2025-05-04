@@ -75,70 +75,113 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         webviewView.webview.onDidReceiveMessage(async (message) => {
             console.log('Received message from webview:', message);
 
-            // Handle different message types with their corresponding handlers
-            switch (message.type) {
-                case 'sendMessage':
-                    // User has sent a message/query to the AI
-                    console.log('User message:', message.text);
-                    await this.handleUserQuery(message.text);
-                    break;
+            try {
+                // Validate message
+                if (!message || typeof message !== 'object') {
+                    throw new Error('Invalid message received from webview');
+                }
 
-                case 'searchWorkspaceFiles':
-                    // User is searching for files to add to context
-                    console.log('Received searchWorkspaceFiles request with query:', message.query);
-                    await this.handleFileSearch(message.query);
-                    break;
+                // Handle different message types with their corresponding handlers
+                switch (message.type) {
+                    case 'sendMessage':
+                        // User has sent a message/query to the AI
+                        if (!message.text || typeof message.text !== 'string') {
+                            throw new Error('Invalid message text');
+                        }
+                        console.log('User message:', message.text);
+                        await this.handleUserQuery(message.text);
+                        break;
 
-                case 'addFileToContextViaMention':
-                    // User has selected a file to add to context via @ mention
-                    console.log('Received addFileToContextViaMention request with URI:', message.uriString);
-                    await this.handleAddFileToContext(message.uriString);
-                    break;
+                    case 'searchWorkspaceFiles':
+                        // User is searching for files to add to context
+                        if (!message.query || typeof message.query !== 'string') {
+                            throw new Error('Invalid search query');
+                        }
+                        console.log('Received searchWorkspaceFiles request with query:', message.query);
+                        await this.handleFileSearch(message.query);
+                        break;
 
-                case 'insertCode':
-                    // User wants to insert code from a response into the editor
-                    console.log('Received insertCode request with code length:', message.code.length);
-                    await this.handleInsertCode(message.code);
-                    break;
+                    case 'addFileToContextViaMention':
+                        // User has selected a file to add to context via @ mention
+                        if (!message.uriString || typeof message.uriString !== 'string') {
+                            throw new Error('Invalid URI string');
+                        }
+                        console.log('Received addFileToContextViaMention request with URI:', message.uriString);
+                        await this.handleAddFileToContext(message.uriString);
+                        break;
 
-                case 'removeFileFromContext':
-                    // User has removed a file from context (clicked X on a pill)
-                    console.log('Received removeFileFromContext request with URI:', message.uriString);
-                    await this.handleRemoveFileFromContext(message.uriString);
-                    break;
+                    case 'insertCode':
+                        // User wants to insert code from a response into the editor
+                        if (!message.code || typeof message.code !== 'string') {
+                            throw new Error('Invalid code content');
+                        }
+                        console.log('Received insertCode request with code length:', message.code.length);
+                        await this.handleInsertCode(message.code);
+                        break;
 
-                case 'clearChat':
-                    // User wants to start a new chat
-                    console.log('Received clearChat request');
-                    await this.clearConversationAndContext();
-                    break;
+                    case 'removeFileFromContext':
+                        // User has removed a file from context (clicked X on a pill)
+                        if (!message.uriString || typeof message.uriString !== 'string') {
+                            throw new Error('Invalid URI string');
+                        }
+                        console.log('Received removeFileFromContext request with URI:', message.uriString);
+                        await this.handleRemoveFileFromContext(message.uriString);
+                        break;
 
-                case 'showInfoMessage':
-                    // Show an information message in VS Code
-                    console.log('Received showInfoMessage request:', message.text);
-                    vscode.window.showInformationMessage(message.text);
-                    break;
+                    case 'clearChat':
+                        // User wants to start a new chat
+                        console.log('Received clearChat request');
+                        await this.clearConversationAndContext();
+                        break;
 
-                case 'showHistory':
-                    // User wants to view chat history
-                    console.log('Received showHistory request');
-                    await this.showHistory();
-                    break;
+                    case 'showInfoMessage':
+                        // Show an information message in VS Code
+                        if (!message.text || typeof message.text !== 'string') {
+                            throw new Error('Invalid message text');
+                        }
+                        console.log('Received showInfoMessage request:', message.text);
+                        vscode.window.showInformationMessage(message.text);
+                        break;
 
-                case 'getRecentFiles':
-                    // User wants to see recently opened files (for @ mentions)
-                    console.log('Received getRecentFiles request');
-                    await this.getRecentFiles();
-                    break;
+                    case 'showHistory':
+                        // User wants to view chat history
+                        console.log('Received showHistory request');
+                        await this.showHistory();
+                        break;
 
-                case 'requestContextUpdate':
-                    // Frontend is requesting a context update
-                    console.log('>>> Received requestContextUpdate');
-                    this.sendContextUpdateToWebview();
-                    break;
+                    case 'getRecentFiles':
+                        // User wants to see recently opened files (for @ mentions)
+                        console.log('Received getRecentFiles request');
+                        await this.getRecentFiles();
+                        break;
 
-                default:
-                    console.log('Unhandled message type:', message.type);
+                    case 'requestContextUpdate':
+                        // Frontend is requesting a context update
+                        console.log('>>> Received requestContextUpdate');
+                        this.sendContextUpdateToWebview();
+                        break;
+
+                    default:
+                        console.log('Unhandled message type:', message.type);
+                }
+            } catch (error: any) {
+                // Log the error with the message that caused it
+                console.error('Error handling webview message:', message, error);
+
+                // Show an error notification to the user
+                vscode.window.showErrorMessage(`Error processing action: ${error.message || 'Unknown error'}`);
+
+                // If this was a user query that failed, send an error message to the webview
+                if (message.type === 'sendMessage') {
+                    this.sendMessageToWebview({
+                        type: 'geminiError',
+                        text: `Error processing your request: ${error.message || 'Unknown error'}`
+                    });
+
+                    // Also send stream end to clean up UI state if needed
+                    this.sendMessageToWebview({ type: 'geminiStreamEnd' });
+                    this.sendMessageToWebview({ type: 'geminiFinishedThinking' });
+                }
             }
         });
     }

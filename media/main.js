@@ -559,158 +559,282 @@
 
     // Handle messages from the extension
     window.addEventListener('message', event => {
-        const message = event.data;
+        try {
+            const message = event.data;
 
-        console.log('Webview received message from extension:', message);
+            // Validate message
+            if (!message || typeof message !== 'object' || !message.type) {
+                console.error('Invalid message received from extension:', message);
+                return;
+            }
 
-        switch (message.type) {
-            case 'updateContextFiles':
-                console.log('Handling updateContextFiles with files:', message.files);
-                // Store the files but don't update UI (pills are managed directly)
-                contextFiles = message.files;
-                break;
-            case 'updateContextPills':
-                console.log('>>> Handling updateContextPills with paths:', message.contextPaths);
-                console.log('>>> URI strings:', message.contextUriStrings);
+            console.log('Webview received message from extension:', message.type);
 
-                // This is the new centralized way to update context pills
-                // We completely rebuild the pills based on the backend state
-                updateContextPillsFromBackend(message.contextPaths, message.contextUriStrings);
-                break;
+            try {
+                switch (message.type) {
+                    case 'updateContextFiles':
+                        console.log('Handling updateContextFiles with files:', message.files);
+                        // Store the files but don't update UI (pills are managed directly)
+                        if (Array.isArray(message.files)) {
+                            contextFiles = message.files;
+                        } else {
+                            console.error('Invalid files array in updateContextFiles:', message.files);
+                        }
+                        break;
 
-            case 'contextUpdated':
-                console.log('>>> Handling legacy contextUpdated with files:', message.files);
-                // Store the files for backward compatibility
-                contextFiles = message.files;
+                    case 'updateContextPills':
+                        console.log('>>> Handling updateContextPills');
 
-                // Log the current pills in the DOM for debugging
-                const currentPills = Array.from(contextPillsElement.children);
-                console.log('>>> Current pills in DOM:', currentPills.map(pill => pill.dataset.uri));
-                break;
-            case 'addChatMessage':
-                console.log('Handling addChatMessage:', message);
-                addChatMessage(message.sender, message.text);
-                break;
-            case 'assistantResponse':
-                console.log('Handling assistantResponse:', message.text);
-                addChatMessage('assistant', message.text);
-                break;
-            case 'geminiThinking':
-                console.log('Handling geminiThinking');
-                // Stop any ongoing animation
-                stopCharacterAnimation();
-                // Reset streaming state
-                if (currentAssistantMessageElement) {
-                    currentAssistantMessageElement = null;
-                    accumulatedResponseText = '';
+                        // Validate required properties
+                        if (!Array.isArray(message.contextPaths)) {
+                            console.error('Invalid contextPaths in updateContextPills:', message.contextPaths);
+                            return;
+                        }
+
+                        // This is the new centralized way to update context pills
+                        // We completely rebuild the pills based on the backend state
+                        updateContextPillsFromBackend(message.contextPaths, message.contextUriStrings);
+                        break;
+
+                    case 'contextUpdated':
+                        console.log('>>> Handling legacy contextUpdated');
+                        // Store the files for backward compatibility
+                        if (Array.isArray(message.files)) {
+                            contextFiles = message.files;
+
+                            // Log the current pills in the DOM for debugging
+                            try {
+                                const currentPills = Array.from(contextPillsElement.children);
+                                console.log('>>> Current pills in DOM:', currentPills.length);
+                            } catch (error) {
+                                console.error('Error logging current pills:', error);
+                            }
+                        } else {
+                            console.error('Invalid files array in contextUpdated:', message.files);
+                        }
+                        break;
+
+                    case 'addChatMessage':
+                        if (!message.sender || !message.text) {
+                            console.error('Invalid addChatMessage parameters:', message);
+                            return;
+                        }
+                        console.log('Handling addChatMessage from:', message.sender);
+                        addChatMessage(message.sender, message.text);
+                        break;
+
+                    case 'assistantResponse':
+                        if (!message.text) {
+                            console.error('Invalid assistantResponse text:', message);
+                            return;
+                        }
+                        console.log('Handling assistantResponse');
+                        addChatMessage('assistant', message.text);
+                        break;
+
+                    case 'geminiThinking':
+                        console.log('Handling geminiThinking');
+                        // Stop any ongoing animation
+                        stopCharacterAnimation();
+                        // Reset streaming state
+                        if (currentAssistantMessageElement) {
+                            currentAssistantMessageElement = null;
+                            accumulatedResponseText = '';
+                        }
+                        showThinkingIndicator();
+                        break;
+
+                    case 'geminiStreamStart':
+                        console.log('Handling geminiStreamStart');
+                        // Create a placeholder for the streaming response
+                        hideThinkingIndicator();
+                        startStreamingResponse();
+                        break;
+
+                    case 'geminiResponseChunk':
+                        if (!message.chunk) {
+                            console.error('Missing chunk in geminiResponseChunk:', message);
+                            return;
+                        }
+                        // Add the chunk to the current response
+                        appendResponseChunk(message.chunk);
+                        break;
+
+                    case 'geminiStreamEnd':
+                        console.log('Handling geminiStreamEnd');
+                        // Finalize the response with markdown rendering
+                        finalizeStreamingResponse();
+                        break;
+
+                    case 'geminiResponse':
+                        if (!message.text) {
+                            console.error('Missing text in geminiResponse:', message);
+                            return;
+                        }
+                        console.log('Handling geminiResponse');
+                        // This is for backward compatibility or non-streaming responses
+                        hideThinkingIndicator();
+                        addChatMessage('assistant', message.text);
+                        break;
+
+                    case 'geminiError':
+                        console.log('Handling geminiError');
+                        hideThinkingIndicator();
+                        // Stop any ongoing animation
+                        stopCharacterAnimation();
+                        // If we were in the middle of streaming, clean up
+                        if (currentAssistantMessageElement) {
+                            try {
+                                currentAssistantMessageElement.remove();
+                            } catch (error) {
+                                console.error('Error removing assistant message element:', error);
+                            }
+                            currentAssistantMessageElement = null;
+                            accumulatedResponseText = '';
+                        }
+                        showErrorMessage(message.text || 'An unknown error occurred');
+                        break;
+
+                    case 'geminiFinishedThinking':
+                        console.log('Handling geminiFinishedThinking');
+                        hideThinkingIndicator();
+                        break;
+
+                    case 'clearChat':
+                        console.log('Handling clearChat');
+                        clearChat();
+                        break;
+
+                    case 'fileSearchResults':
+                        console.log('Handling fileSearchResults');
+                        console.log('Number of results:', message.results ? message.results.length : 0);
+                        displayFileSearchResults(message.results, message.isRecent);
+                        break;
+
+                    case 'fileAddedToContext':
+                        if (message.success) {
+                            console.log(`File added to context: ${message.path}`);
+                        } else {
+                            console.error('Failed to add file to context:', message.error);
+                        }
+                        break;
+
+                    case 'restoreChat':
+                        if (!message.history || !Array.isArray(message.history)) {
+                            console.error('Invalid history in restoreChat:', message);
+                            return;
+                        }
+                        console.log('Handling restoreChat with history length:', message.history.length);
+                        restoreChat(message.history);
+                        break;
+
+                    case 'restoreContextPills':
+                        if (!message.contextPaths || !Array.isArray(message.contextPaths)) {
+                            console.error('Invalid contextPaths in restoreContextPills:', message);
+                            return;
+                        }
+                        console.log('Handling restoreContextPills');
+                        restoreContextPills(message.contextPaths, message.contextUriStrings);
+                        break;
+
+                    default:
+                        console.log('Unhandled message type:', message.type);
                 }
-                showThinkingIndicator();
-                break;
-            case 'geminiStreamStart':
-                console.log('Handling geminiStreamStart');
-                // Create a placeholder for the streaming response
-                hideThinkingIndicator();
-                startStreamingResponse();
-                break;
-            case 'geminiResponseChunk':
-                console.log('Handling geminiResponseChunk');
-                // Add the chunk to the current response
-                appendResponseChunk(message.chunk);
-                break;
-            case 'geminiStreamEnd':
-                console.log('Handling geminiStreamEnd');
-                // Finalize the response with markdown rendering
-                finalizeStreamingResponse();
-                break;
-            case 'geminiResponse':
-                console.log('Handling geminiResponse:', message.text);
-                // This is for backward compatibility or non-streaming responses
-                hideThinkingIndicator();
-                addChatMessage('assistant', message.text);
-                break;
-            case 'geminiError':
-                console.log('Handling geminiError:', message.text);
-                hideThinkingIndicator();
-                // Stop any ongoing animation
-                stopCharacterAnimation();
-                // If we were in the middle of streaming, clean up
-                if (currentAssistantMessageElement) {
-                    currentAssistantMessageElement.remove();
-                    currentAssistantMessageElement = null;
-                    accumulatedResponseText = '';
+            } catch (innerError) {
+                // Handle errors in specific message type handling
+                console.error(`Error handling message type '${message.type}':`, innerError);
+
+                // Show error message for critical errors
+                if (['geminiResponse', 'geminiResponseChunk', 'geminiStreamEnd'].includes(message.type)) {
+                    showErrorMessage(`Error processing response: ${innerError.message}`);
                 }
-                showErrorMessage(message.text);
-                break;
-            case 'geminiFinishedThinking':
-                console.log('Handling geminiFinishedThinking');
-                hideThinkingIndicator();
-                break;
-            case 'clearChat':
-                console.log('Handling clearChat');
-                clearChat();
-                break;
-            case 'fileSearchResults':
-                console.log('Handling fileSearchResults with results:', message.results);
-                console.log('Number of results:', message.results ? message.results.length : 0);
-                console.log('Is recent files:', message.isRecent);
-                displayFileSearchResults(message.results, message.isRecent);
-                break;
-            case 'fileAddedToContext':
-                if (message.success) {
-                    console.log(`File added to context: ${message.path}`);
-                } else {
-                    console.error('Failed to add file to context:', message.error);
-                }
-                break;
-            case 'restoreChat':
-                console.log('Handling restoreChat with history length:', message.history.length);
-                restoreChat(message.history);
-                break;
-            case 'restoreContextPills':
-                console.log('Handling restoreContextPills with paths:', message.contextPaths);
-                restoreContextPills(message.contextPaths, message.contextUriStrings);
-                break;
-            default:
-                console.log('Unhandled message type:', message.type);
+            }
+        } catch (outerError) {
+            // Handle errors in the overall message event handler
+            console.error('Critical error in message event handler:', outerError);
+
+            // Try to show an error message
+            try {
+                showErrorMessage('A critical error occurred. Please reload the extension.');
+            } catch (finalError) {
+                console.error('Failed to show error message:', finalError);
+            }
         }
     });
 
     // Functions
     function sendMessage() {
-        const text = userInputElement.value.trim();
-        if (text) {
+        try {
+            const text = userInputElement.value.trim();
+            if (!text) {
+                return; // Nothing to send
+            }
+
             // Collect active context pills before sending the message
             const activeContextFiles = [];
-            const pillElements = contextPillsElement.querySelectorAll('.context-pill');
 
-            console.log(`>>> Send Message: Found ${pillElements.length} active context pills`);
+            try {
+                const pillElements = contextPillsElement.querySelectorAll('.context-pill');
+                console.log(`>>> Send Message: Found ${pillElements.length} active context pills`);
 
-            // Extract information from each pill
-            pillElements.forEach(pill => {
-                const filenameElement = pill.querySelector('.pill-filename');
-                if (filenameElement && filenameElement.textContent) {
-                    activeContextFiles.push({
-                        text: filenameElement.textContent,
-                        uri: pill.dataset.uri
-                    });
-                    console.log(`>>> Send Message: Added context file: ${filenameElement.textContent}`);
-                }
-            });
+                // Extract information from each pill
+                pillElements.forEach(pill => {
+                    try {
+                        const filenameElement = pill.querySelector('.pill-filename');
+                        if (filenameElement && filenameElement.textContent) {
+                            activeContextFiles.push({
+                                text: filenameElement.textContent,
+                                uri: pill.dataset.uri
+                            });
+                            console.log(`>>> Send Message: Added context file: ${filenameElement.textContent}`);
+                        }
+                    } catch (pillError) {
+                        console.error('Error processing context pill:', pillError);
+                        // Continue with other pills
+                    }
+                });
+            } catch (pillsError) {
+                console.error('Error collecting context pills:', pillsError);
+                // Continue with sending the message without context
+            }
 
-            // Add message to UI with context files
-            addChatMessage('user', text, activeContextFiles);
+            try {
+                // Add message to UI with context files
+                addChatMessage('user', text, activeContextFiles);
+            } catch (uiError) {
+                console.error('Error adding message to UI:', uiError);
+                // Try to continue with sending the message
+            }
 
-            // Send message to extension
-            vscode.postMessage({
-                type: 'sendMessage',
-                text: text
-            });
+            try {
+                // Send message to extension
+                vscode.postMessage({
+                    type: 'sendMessage',
+                    text: text
+                });
+            } catch (sendError) {
+                console.error('Error sending message to extension:', sendError);
+                showErrorMessage('Failed to send message to the extension. Please reload the extension.');
+                return; // Stop processing if we can't send the message
+            }
 
-            // Clear input
-            userInputElement.value = '';
+            try {
+                // Clear input
+                userInputElement.value = '';
 
-            // Resize the textarea
-            autoResizeTextarea();
+                // Resize the textarea
+                autoResizeTextarea();
+            } catch (cleanupError) {
+                console.error('Error cleaning up after sending message:', cleanupError);
+                // Non-critical error, can be ignored
+            }
+        } catch (error) {
+            console.error('Critical error in sendMessage function:', error);
+            try {
+                showErrorMessage('An error occurred while sending your message. Please try again.');
+            } catch (finalError) {
+                console.error('Failed to show error message:', finalError);
+            }
         }
     }
 
@@ -1482,164 +1606,194 @@
         }
     }
 
-    // Function to show error message
+    // Function to show error message with improved error handling and visual styling
     function showErrorMessage(errorText) {
-        // Add error message
-        const errorElement = document.createElement('div');
-        errorElement.className = 'message error-message';
+        try {
+            // Validate input
+            if (!errorText) {
+                errorText = 'An unknown error occurred';
+            }
 
-        const senderElement = document.createElement('div');
-        senderElement.className = 'message-sender';
-        senderElement.textContent = 'Error';
+            // Add error message
+            const errorElement = document.createElement('div');
+            errorElement.className = 'message error-message';
 
-        const textElement = document.createElement('div');
-        textElement.className = 'message-text';
+            // Add a visual error icon to make errors more noticeable
+            const senderElement = document.createElement('div');
+            senderElement.className = 'message-sender';
+            senderElement.innerHTML = '<i class="codicon codicon-error"></i> Error';
 
-        // Format the error message as markdown if it contains code blocks
-        if (errorText.includes('```')) {
-            try {
-                const md = window.markdownit({
-                    html: false,
-                    linkify: true,
-                    typographer: true,
-                    highlight: function (str, lang) {
-                        console.log('Highlighting error code block with language:', lang);
+            const textElement = document.createElement('div');
+            textElement.className = 'message-text';
 
-                        if (lang && window.hljs.getLanguage(lang)) {
+            // Categorize common error types for better user feedback
+            let enhancedErrorText = errorText;
+
+            // Check for specific error types and enhance the message
+            if (errorText.includes('API key') || errorText.includes('Authentication')) {
+                enhancedErrorText = `${errorText}\n\nPlease check your API key in the settings.`;
+            } else if (errorText.includes('Network') || errorText.includes('connection')) {
+                enhancedErrorText = `${errorText}\n\nPlease check your internet connection and try again.`;
+            } else if (errorText.includes('Rate Limit')) {
+                enhancedErrorText = `${errorText}\n\nThe API is currently rate limited. Please wait a moment before trying again.`;
+            } else if (errorText.includes('Content Safety')) {
+                enhancedErrorText = `${errorText}\n\nYour request was blocked by content safety filters. Please modify your query and try again.`;
+            } else if (errorText.includes('Model Limitation')) {
+                enhancedErrorText = `${errorText}\n\nTry reducing the amount of context or simplifying your query.`;
+            }
+
+            // Format the error message as markdown if it contains code blocks
+            if (enhancedErrorText.includes('```')) {
+                try {
+                    const md = window.markdownit({
+                        html: false,
+                        linkify: true,
+                        typographer: true,
+                        highlight: function (str, lang) {
                             try {
-                                // Properly wrap the highlighted code in pre and code tags
-                                return '<pre class="hljs"><code class="language-' + lang + '">' +
-                                       window.hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
-                                       '</code></pre>';
+                                if (lang && window.hljs.getLanguage(lang)) {
+                                    // Properly wrap the highlighted code in pre and code tags
+                                    return '<pre class="hljs"><code class="language-' + lang + '">' +
+                                           window.hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
+                                           '</code></pre>';
+                                }
                             } catch (error) {
                                 console.error('Error highlighting code in error message:', error);
                             }
-                        }
 
-                        // Use default escaping if no language or highlight fails
-                        return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>';
-                    }
-                });
-
-                const renderedHtml = md.render(errorText);
-                console.log('Rendered error HTML:', renderedHtml);
-
-                textElement.innerHTML = renderedHtml;
-                errorElement.classList.add('markdown-message');
-
-                // Apply highlighting to any code blocks that might have been missed
-                // and add action buttons to code blocks
-                setTimeout(() => {
-                    const preBlocks = textElement.querySelectorAll('pre');
-                    console.log('Found', preBlocks.length, 'pre blocks for highlighting and buttons in error');
-
-                    preBlocks.forEach(preBlock => {
-                        try {
-                            // Find the code element inside the pre block
-                            const codeBlock = preBlock.querySelector('code');
-                            if (codeBlock) {
-                                // Apply syntax highlighting
-                                window.hljs.highlightElement(codeBlock);
-
-                                // Add a container for the code block and buttons
-                                const codeContainer = document.createElement('div');
-                                codeContainer.className = 'code-block-container';
-
-                                // Create button container
-                                const buttonContainer = document.createElement('div');
-                                buttonContainer.className = 'code-block-buttons';
-
-                                // Create Copy button
-                                const copyButton = document.createElement('button');
-                                copyButton.className = 'code-button copy-button';
-                                copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
-                                copyButton.title = 'Copy code to clipboard';
-
-                                // Create Insert button
-                                const insertButton = document.createElement('button');
-                                insertButton.className = 'code-button insert-button';
-                                insertButton.innerHTML = '<i class="codicon codicon-insert"></i>';
-                                insertButton.title = 'Insert code at cursor position';
-
-                                // Add event listener for Copy button
-                                copyButton.addEventListener('click', () => {
-                                    const codeText = codeBlock.textContent;
-                                    navigator.clipboard.writeText(codeText)
-                                        .then(() => {
-                                            // Show feedback
-                                            copyButton.innerHTML = '<i class="codicon codicon-check"></i>';
-                                            copyButton.classList.add('copied');
-
-                                            // Reset after 2 seconds
-                                            setTimeout(() => {
-                                                copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
-                                                copyButton.classList.remove('copied');
-                                            }, 2000);
-                                        })
-                                        .catch(err => {
-                                            console.error('Error copying text: ', err);
-                                            copyButton.innerHTML = '<i class="codicon codicon-error"></i>';
-
-                                            // Reset after 2 seconds
-                                            setTimeout(() => {
-                                                copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
-                                            }, 2000);
-                                        });
-                                });
-
-                                // Add event listener for Insert button
-                                insertButton.addEventListener('click', () => {
-                                    const codeText = codeBlock.textContent;
-                                    vscode.postMessage({
-                                        type: 'insertCode',
-                                        code: codeText
-                                    });
-
-                                    // Show feedback
-                                    insertButton.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i>';
-
-                                    // Reset after 2 seconds
-                                    setTimeout(() => {
-                                        insertButton.innerHTML = '<i class="codicon codicon-add"></i>';
-                                    }, 2000);
-                                });
-
-                                // Add buttons to button container
-                                buttonContainer.appendChild(copyButton);
-                                buttonContainer.appendChild(insertButton);
-
-                                // Wrap the pre block with our container
-                                preBlock.parentNode.insertBefore(codeContainer, preBlock);
-                                codeContainer.appendChild(preBlock);
-                                codeContainer.appendChild(buttonContainer);
-                            }
-                        } catch (error) {
-                            console.error('Error processing code block in error message:', error);
+                            // Use default escaping if no language or highlight fails
+                            return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>';
                         }
                     });
-                }, 0);
-            } catch (error) {
-                console.error('Error rendering markdown in error message:', error);
-                textElement.textContent = errorText;
+
+                    const renderedHtml = md.render(enhancedErrorText);
+                    textElement.innerHTML = renderedHtml;
+                    errorElement.classList.add('markdown-message');
+
+                    // Apply highlighting to any code blocks that might have been missed
+                    // and add action buttons to code blocks
+                    setTimeout(() => {
+                        try {
+                            const preBlocks = textElement.querySelectorAll('pre');
+
+                            preBlocks.forEach(preBlock => {
+                                try {
+                                    // Find the code element inside the pre block
+                                    const codeBlock = preBlock.querySelector('code');
+                                    if (codeBlock) {
+                                        // Apply syntax highlighting
+                                        window.hljs.highlightElement(codeBlock);
+
+                                        // Add a container for the code block and buttons
+                                        const codeContainer = document.createElement('div');
+                                        codeContainer.className = 'code-block-container';
+
+                                        // Create button container
+                                        const buttonContainer = document.createElement('div');
+                                        buttonContainer.className = 'code-block-buttons';
+
+                                        // Create Copy button
+                                        const copyButton = document.createElement('button');
+                                        copyButton.className = 'code-button copy-button';
+                                        copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
+                                        copyButton.title = 'Copy code to clipboard';
+
+                                        // Add event listener for Copy button
+                                        copyButton.addEventListener('click', () => {
+                                            try {
+                                                const codeText = codeBlock.textContent;
+                                                navigator.clipboard.writeText(codeText)
+                                                    .then(() => {
+                                                        // Show feedback
+                                                        copyButton.innerHTML = '<i class="codicon codicon-check"></i>';
+                                                        copyButton.classList.add('copied');
+
+                                                        // Reset after 2 seconds
+                                                        setTimeout(() => {
+                                                            copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
+                                                            copyButton.classList.remove('copied');
+                                                        }, 2000);
+                                                    })
+                                                    .catch(err => {
+                                                        console.error('Error copying text: ', err);
+                                                        copyButton.innerHTML = '<i class="codicon codicon-error"></i>';
+
+                                                        // Reset after 2 seconds
+                                                        setTimeout(() => {
+                                                            copyButton.innerHTML = '<i class="codicon codicon-copy"></i>';
+                                                        }, 2000);
+                                                    });
+                                            } catch (error) {
+                                                console.error('Error in copy button click handler:', error);
+                                            }
+                                        });
+
+                                        // Add buttons to button container
+                                        buttonContainer.appendChild(copyButton);
+
+                                        // Wrap the pre block with our container
+                                        preBlock.parentNode.insertBefore(codeContainer, preBlock);
+                                        codeContainer.appendChild(preBlock);
+                                        codeContainer.appendChild(buttonContainer);
+                                    }
+                                } catch (error) {
+                                    console.error('Error processing code block in error message:', error);
+                                }
+                            });
+                        } catch (error) {
+                            console.error('Error processing code blocks in error message:', error);
+                        }
+                    }, 0);
+                } catch (error) {
+                    console.error('Error rendering markdown in error message:', error);
+                    textElement.textContent = enhancedErrorText;
+                }
+            } else {
+                textElement.textContent = enhancedErrorText;
             }
-        } else {
-            textElement.textContent = errorText;
-        }
 
-        errorElement.appendChild(senderElement);
-        errorElement.appendChild(textElement);
+            errorElement.appendChild(senderElement);
+            errorElement.appendChild(textElement);
 
-        chatHistoryElement.appendChild(errorElement);
+            chatHistoryElement.appendChild(errorElement);
 
-        // Scroll to bottom
-        chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
+            // Scroll to bottom
+            chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
 
-        // Save state
-        saveState();
+            // Save state
+            try {
+                saveState();
+            } catch (error) {
+                console.error('Error saving state after error message:', error);
+            }
 
-        // Call the global highlight function after a short delay to ensure DOM is updated
-        if (errorText.includes('```') && typeof window.highlightAllCodeBlocks === 'function') {
-            setTimeout(window.highlightAllCodeBlocks, 100);
+            // Call the global highlight function after a short delay to ensure DOM is updated
+            if (enhancedErrorText.includes('```') && typeof window.highlightAllCodeBlocks === 'function') {
+                setTimeout(() => {
+                    try {
+                        window.highlightAllCodeBlocks();
+                    } catch (error) {
+                        console.error('Error highlighting code blocks:', error);
+                    }
+                }, 100);
+            }
+        } catch (error) {
+            // Last resort error handling - if our error handler itself fails
+            console.error('Critical error in showErrorMessage function:', error);
+
+            try {
+                // Create a simple error message without any fancy formatting
+                const fallbackErrorElement = document.createElement('div');
+                fallbackErrorElement.className = 'message error-message';
+                fallbackErrorElement.textContent = 'An error occurred. Please try again or reload the extension.';
+                chatHistoryElement.appendChild(fallbackErrorElement);
+
+                // Scroll to bottom
+                chatHistoryElement.scrollTop = chatHistoryElement.scrollHeight;
+            } catch (finalError) {
+                // Nothing more we can do if this fails
+                console.error('Failed to display fallback error message:', finalError);
+            }
         }
     }
 
