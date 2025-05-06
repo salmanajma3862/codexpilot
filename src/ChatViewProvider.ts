@@ -168,6 +168,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                         this.sendContextUpdateToWebview();
                         break;
 
+                    case 'toggleAutoContextActive':
+                        // Toggle the auto context active state
+                        console.log('>>> Received toggleAutoContextActive');
+                        // Import the function to access the global state
+                        const { toggleAutoContextActive } = require('./extension');
+                        toggleAutoContextActive();
+                        break;
+
                     case 'getActiveSelectionInfo':
                         // User wants to modify selected code
                         console.log('Received getActiveSelectionInfo request');

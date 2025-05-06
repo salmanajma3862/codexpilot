@@ -476,30 +476,31 @@
         // Check if this is the current file (auto context)
         const isCurrent = file.isCurrent === true;
 
-        console.log(`>>> Create Context Pill: Creating pill for path: ${file.path}, URI: ${file.uriString}, isCurrent: ${isCurrent}`);
+        // Check if the auto context is active (default to true if not specified)
+        const isActive = file.isActive !== undefined ? file.isActive : true;
+
+        console.log(`>>> Create Context Pill: Creating pill for path: ${file.path}, URI: ${file.uriString}, isCurrent: ${isCurrent}, isActive: ${isActive}`);
 
         // Create the pill element
         const pill = document.createElement('div');
         pill.className = 'context-pill';
         if (isCurrent) {
             pill.classList.add('current-context-pill');
+            // Add inactive class if the auto context is not active
+            if (!isActive) {
+                pill.classList.add('inactive-context-pill');
+            }
         }
         pill.dataset.uri = file.uriString;
         pill.dataset.isCurrent = isCurrent.toString();
+        pill.dataset.isActive = isActive.toString();
 
         // Create the filename span
         const filename = document.createElement('span');
         filename.className = 'pill-filename';
         filename.textContent = file.path;
 
-        // If this is the current file, add a "Current" tag
-        if (isCurrent) {
-            const currentTag = document.createElement('span');
-            currentTag.className = 'current-tag';
-            currentTag.textContent = 'Current';
-            filename.appendChild(document.createTextNode(' '));
-            filename.appendChild(currentTag);
-        }
+        // No longer adding the "Current" tag as we're using the eye icon instead
 
         // Create the close button (only for manually added files)
         const closeButton = document.createElement('button');
@@ -512,9 +513,36 @@
 
         closeButton.title = 'Remove from context';
 
-        // Hide the close button for auto context pills
+        // For auto context pills, create an eye toggle button instead of close button
         if (isCurrent) {
+            // Hide the close button
             closeButton.style.display = 'none';
+
+            // Create the eye toggle button
+            const toggleButton = document.createElement('button');
+            toggleButton.className = 'context-pill-toggle';
+            toggleButton.dataset.action = 'toggle-auto-context';
+
+            // Use Codicon for eye icon
+            const eyeIcon = document.createElement('i');
+            eyeIcon.className = isActive ? 'codicon codicon-eye' : 'codicon codicon-eye-closed';
+            toggleButton.appendChild(eyeIcon);
+
+            toggleButton.title = isActive ? 'Exclude from context' : 'Include in context';
+
+            // Add event listener to toggle button
+            toggleButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                console.log('>>> Toggle auto context button clicked');
+
+                // Send message to extension to toggle auto context active state
+                vscode.postMessage({ type: 'toggleAutoContextActive' });
+            });
+
+            // Add the toggle button to the pill
+            pill.appendChild(toggleButton);
         }
 
         // Add event listener to close button (only for manually added files)
@@ -545,7 +573,9 @@
 
         // Assemble the pill
         pill.appendChild(filename);
-        pill.appendChild(closeButton);
+        if (!isCurrent) {
+            pill.appendChild(closeButton);
+        }
 
         // Add the pill to the context pills container
         contextPillsElement.appendChild(pill);
@@ -1304,7 +1334,8 @@
                 createContextPill({
                     path: item.path,
                     uriString: item.uriString,
-                    isCurrent: item.isCurrent === true
+                    isCurrent: item.isCurrent === true,
+                    isActive: item.isActive !== undefined ? item.isActive : true // Pass the isActive flag
                 });
             });
 

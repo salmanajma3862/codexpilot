@@ -17,6 +17,9 @@ let manuallyAddedContextUris = new Set<string>();
 // Store the automatically tracked file URI
 let currentAutoContextUri: vscode.Uri | null = null;
 
+// Flag to control whether the auto-tracked file is included in context
+let isAutoContextActive: boolean = true;
+
 // Store a reference to the ChatViewProvider instance
 let chatProviderInstance: ChatViewProvider | null = null;
 
@@ -111,8 +114,8 @@ export function getContextFileUris(): vscode.Uri[] {
         }
     }
 
-    // Add the auto context URI if it exists and is not already in the result
-    if (currentAutoContextUri) {
+    // Add the auto context URI if it exists, is not already in the result, and is active
+    if (currentAutoContextUri && isAutoContextActive) {
         const autoUriString = currentAutoContextUri.toString();
         if (!manuallyAddedContextUris.has(autoUriString)) {
             result.push(currentAutoContextUri);
@@ -120,6 +123,20 @@ export function getContextFileUris(): vscode.Uri[] {
     }
 
     return result;
+}
+
+/**
+ * Toggle the auto context active state
+ * This function toggles whether the auto-tracked file is included in the context
+ */
+export function toggleAutoContextActive(): void {
+    // Toggle the state
+    isAutoContextActive = !isAutoContextActive;
+
+    console.log(`>>> Toggled auto context active state: ${isAutoContextActive}`);
+
+    // Sync the updated state to the webview
+    syncContextStateToWebview();
 }
 
 /**
@@ -250,7 +267,8 @@ export function syncContextStateToWebview(): void {
                 contextItems.push({
                     uriString: autoUriString,
                     path: vscode.workspace.asRelativePath(currentAutoContextUri),
-                    isCurrent: true
+                    isCurrent: true,
+                    isActive: isAutoContextActive // Include the active state flag
                 });
             }
         }
@@ -399,31 +417,46 @@ export async function searchWorkspaceFiles(query: string, maxResults: number = 1
 export function handleActiveEditorChange(editor: vscode.TextEditor | undefined): void {
     console.log('>>> handleActiveEditorChange called');
 
-    // Get the old auto context URI
-    const oldAutoUri = currentAutoContextUri;
+    // Get the old auto context URI string for comparison
+    const oldAutoUriString = currentAutoContextUri?.toString();
+    let newAutoUri: vscode.Uri | null = null;
 
     // If there's a valid editor with a file
     if (editor && editor.document && editor.document.uri) {
         // Check if it's a file in the workspace (not an untitled file or output panel)
         if (editor.document.uri.scheme === 'file') {
-            // Set the new auto context URI
-            currentAutoContextUri = editor.document.uri;
-            console.log(`>>> Auto context updated to: ${currentAutoContextUri.toString()}`);
+            // Check if it's in a workspace folder
+            const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+            if (workspaceFolder) {
+                // Set the new auto context URI
+                newAutoUri = editor.document.uri;
+                console.log(`>>> Auto context updated to: ${newAutoUri.toString()}`);
+            } else {
+                console.log('>>> Auto context not updated (file not in workspace folder)');
+            }
         } else {
-            // Not a valid workspace file, clear the auto context
-            currentAutoContextUri = null;
-            console.log('>>> Auto context cleared (not a workspace file)');
+            // Not a valid workspace file
+            console.log('>>> Auto context not updated (not a workspace file)');
         }
     } else {
-        // No active editor, clear the auto context
-        currentAutoContextUri = null;
-        console.log('>>> Auto context cleared (no active editor)');
+        // No active editor
+        console.log('>>> Auto context not updated (no active editor)');
     }
 
+    // Get the new auto context URI string for comparison
+    const newAutoUriString = newAutoUri?.toString();
+
+    // Reset eye state ONLY if the auto-context file actually changes
+    if (newAutoUriString !== oldAutoUriString) {
+        console.log('>>> Auto-context file changed, resetting visibility to active.');
+        isAutoContextActive = true;
+    }
+
+    // Update the tracked URI
+    currentAutoContextUri = newAutoUri;
+
     // If the auto context has changed, sync the state to the webview
-    if ((oldAutoUri && !currentAutoContextUri) ||
-        (!oldAutoUri && currentAutoContextUri) ||
-        (oldAutoUri && currentAutoContextUri && oldAutoUri.toString() !== currentAutoContextUri.toString())) {
+    if (newAutoUriString !== oldAutoUriString) {
         syncContextStateToWebview();
     }
 }

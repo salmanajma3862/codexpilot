@@ -395,6 +395,13 @@ body {
     color: var(--vscode-statusBarItem-prominentForeground, var(--vscode-button-foreground));
 }
 
+/* Inactive context pill styling */
+.inactive-context-pill {
+    opacity: 0.7;
+    background-color: var(--vscode-disabledForeground, var(--vscode-descriptionForeground));
+    color: var(--vscode-foreground);
+}
+
 /* Current tag styling */
 .current-tag {
     font-size: 9px;
@@ -405,6 +412,30 @@ body {
     text-transform: uppercase;
     font-weight: bold;
     letter-spacing: 0.5px;
+}
+
+/* Context pill toggle button (eye icon) */
+.context-pill-toggle {
+    background: none;
+    border: none;
+    padding: 0 2px;
+    margin-left: 2px;
+    color: var(--vscode-icon-foreground);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    font-size: 12px;
+    line-height: 1;
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
+}
+
+.context-pill-toggle:hover {
+    opacity: 1;
+}
+
+.context-pill-toggle .codicon {
+    font-size: 14px;
 }
 
 .pill-filename {
