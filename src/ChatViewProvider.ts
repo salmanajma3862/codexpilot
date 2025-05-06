@@ -717,7 +717,7 @@ If the user asks about code and there's no context provided, just answer based o
 IMPORTANT: The user has provided a specific code snippet selected from their editor. Modify *only* this provided code snippet based on the user's request below it.
 Do not add imports or other code outside the snippet scope in the final code block; describe those separately if needed.
 Always include the complete modified code in a single markdown code block with the appropriate language tag.
-Be explanatory and clear in your explanations.`
+Be explanatory and clear in your explanations.`;
             }
 
             // Check if we have actual context files or just the default "no context" message
@@ -963,12 +963,22 @@ Be explanatory and clear in your explanations.`
                 } catch (formatError) {
                     console.log('Format after modification failed (non-critical):', formatError);
                 }
+
+                // Send a success message back to the webview with the applied code
+                // This allows the webview to find and update the corresponding button
+                this.sendMessageToWebview({
+                    type: 'applyModificationSucceeded',
+                    appliedCode: suggestedCode
+                });
+
+                // Clear the stored selection info after sending the success message
+                this.activeSelectionModificationInfo = undefined;
             } else {
                 vscode.window.showErrorMessage('Failed to apply code modification.');
-            }
 
-            // Clear the stored selection info
-            this.activeSelectionModificationInfo = undefined;
+                // Clear the stored selection info even on failure
+                this.activeSelectionModificationInfo = undefined;
+            }
         } catch (error) {
             console.error('Error applying code modification:', error);
             vscode.window.showErrorMessage('Failed to apply code modification: ' + (error instanceof Error ? error.message : 'Unknown error'));

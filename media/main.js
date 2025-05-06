@@ -757,6 +757,15 @@
                         handlePopulateModificationInput(message.selectedText, message.languageId);
                         break;
 
+                    case 'applyModificationSucceeded':
+                        if (!message.appliedCode) {
+                            console.error('Missing appliedCode in applyModificationSucceeded:', message);
+                            return;
+                        }
+                        console.log('Handling applyModificationSucceeded');
+                        handleApplyModificationSucceeded(message.appliedCode);
+                        break;
+
                     default:
                         console.log('Unhandled message type:', message.type);
                 }
@@ -1917,6 +1926,50 @@
         autoResizeTextarea();
 
         console.log('Input populated with selected code');
+    }
+
+    /**
+     * Handle successful application of code modification
+     * @param {string} appliedCode The code that was successfully applied
+     */
+    function handleApplyModificationSucceeded(appliedCode) {
+        if (!appliedCode) {
+            console.error('No applied code provided');
+            return;
+        }
+
+        console.log('Finding button for applied code');
+
+        try {
+            // Find all apply buttons in the DOM
+            const applyButtons = document.querySelectorAll('.apply-selection-button');
+            console.log(`Found ${applyButtons.length} apply buttons`);
+
+            // Find the button that matches the applied code
+            let matchedButton = null;
+
+            for (const button of applyButtons) {
+                if (button.dataset.suggestedCode === appliedCode) {
+                    matchedButton = button;
+                    break;
+                }
+            }
+
+            if (matchedButton) {
+                console.log('Found matching button for applied code');
+
+                // Update the button text and appearance
+                matchedButton.innerHTML = '<i class="codicon codicon-check"></i> Applied';
+                matchedButton.classList.add('applied-success');
+                matchedButton.disabled = true;
+
+                console.log('Button updated to show success state');
+            } else {
+                console.error('Could not find matching button for applied code');
+            }
+        } catch (error) {
+            console.error('Error handling apply modification success:', error);
+        }
     }
 
     /**
