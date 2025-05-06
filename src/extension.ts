@@ -11,8 +11,11 @@ const SECRET_STORAGE_KEY = 'codexpilotGeminiApiKey';
 const HISTORY_STORAGE_KEY = 'codexpilotChatHistoryList';
 const MAX_SAVED_CHATS = 20;
 
-// Store context file URIs
-let contextFileUris: vscode.Uri[] = [];
+// Store manually added context file URIs
+let manuallyAddedContextUris = new Set<string>();
+
+// Store the automatically tracked file URI
+let currentAutoContextUri: vscode.Uri | null = null;
 
 // Store a reference to the ChatViewProvider instance
 let chatProviderInstance: ChatViewProvider | null = null;
@@ -75,20 +78,48 @@ export function getChatSessionById(context: vscode.ExtensionContext, chatId: str
 }
 
 /**
- * Set the active context URIs
+ * Set the active context URIs (replaces all existing context)
  * @param uris The URIs to set as the active context
  */
 export function setActiveContextUris(uris: vscode.Uri[]): void {
-    contextFileUris = [...uris];
+    // Clear existing context
+    manuallyAddedContextUris.clear();
+    currentAutoContextUri = null;
+
+    // Add all URIs as manually added context
+    for (const uri of uris) {
+        manuallyAddedContextUris.add(uri.toString());
+    }
+
+    // Sync the updated state to the webview
     syncContextStateToWebview();
 }
 
 /**
- * Get the current context file URIs
- * @returns A copy of the current context URIs array
+ * Get the current context file URIs (both manual and auto)
+ * @returns An array of all context URIs
  */
 export function getContextFileUris(): vscode.Uri[] {
-    return [...contextFileUris];
+    const result: vscode.Uri[] = [];
+
+    // Add all manually added URIs
+    for (const uriString of manuallyAddedContextUris) {
+        try {
+            result.push(vscode.Uri.parse(uriString));
+        } catch (error) {
+            console.error(`Error parsing URI string: ${uriString}`, error);
+        }
+    }
+
+    // Add the auto context URI if it exists and is not already in the result
+    if (currentAutoContextUri) {
+        const autoUriString = currentAutoContextUri.toString();
+        if (!manuallyAddedContextUris.has(autoUriString)) {
+            result.push(currentAutoContextUri);
+        }
+    }
+
+    return result;
 }
 
 /**
@@ -97,63 +128,86 @@ export function getContextFileUris(): vscode.Uri[] {
  * @returns The URI object if found, undefined otherwise
  */
 export function getContextUriByString(uriString: string): vscode.Uri | undefined {
-    return contextFileUris.find(uri => uri.toString() === uriString);
+    // Check if it's in the manually added URIs
+    if (manuallyAddedContextUris.has(uriString)) {
+        return vscode.Uri.parse(uriString);
+    }
+
+    // Check if it's the auto context URI
+    if (currentAutoContextUri && currentAutoContextUri.toString() === uriString) {
+        return currentAutoContextUri;
+    }
+
+    return undefined;
 }
 
 /**
- * Add a URI to the context if it doesn't already exist
+ * Add a URI to the manually added context if it doesn't already exist
  * @param uri The URI to add to the context
  * @returns True if the URI was added, false if it already existed or couldn't be added
  */
 export function addUriToContext(uri: vscode.Uri): boolean {
-    // Check if the URI is already in the context
+    // Get the string representation of the URI
     const uriString = uri.toString();
-    const isAlreadyInContext = contextFileUris.some(existingUri => existingUri.toString() === uriString);
 
-    if (isAlreadyInContext) {
-        console.log(`>>> URI already in context: ${uriString}`);
+    // Check if the URI is already in the manually added context
+    if (manuallyAddedContextUris.has(uriString)) {
+        console.log(`>>> URI already in manual context: ${uriString}`);
         return false;
     }
 
-    // Add the URI to the context
-    contextFileUris.push(uri);
-    console.log(`>>> Added URI to context: ${uriString}`);
+    // Add the URI to the manually added context
+    const previousSize = manuallyAddedContextUris.size;
+    manuallyAddedContextUris.add(uriString);
 
-    // Sync the updated state to the webview
-    syncContextStateToWebview();
+    // Check if the URI was actually added
+    if (manuallyAddedContextUris.size > previousSize) {
+        console.log(`>>> Added URI to manual context: ${uriString}`);
 
-    return true;
+        // Sync the updated state to the webview
+        syncContextStateToWebview();
+
+        return true;
+    }
+
+    return false;
 }
 
 /**
- * Remove a URI from the context by its string representation
+ * Remove a URI from the manually added context by its string representation
  * @param uriString The string representation of the URI to remove
  * @returns True if the URI was removed, false if it wasn't found
  */
 export function removeUriFromContext(uriString: string): boolean {
-    // Find the index of the URI to remove
-    const index = contextFileUris.findIndex(uri => uri.toString() === uriString);
-
-    if (index === -1) {
-        console.log(`>>> URI not found in context: ${uriString}`);
+    // Check if the URI is in the manually added context
+    if (!manuallyAddedContextUris.has(uriString)) {
+        console.log(`>>> URI not found in manual context: ${uriString}`);
         return false;
     }
 
-    // Remove the URI from the context
-    contextFileUris.splice(index, 1);
-    console.log(`>>> Removed URI from context: ${uriString}`);
+    // Remove the URI from the manually added context
+    const result = manuallyAddedContextUris.delete(uriString);
 
-    // Sync the updated state to the webview
-    syncContextStateToWebview();
+    if (result) {
+        console.log(`>>> Removed URI from manual context: ${uriString}`);
 
-    return true;
+        // Sync the updated state to the webview
+        syncContextStateToWebview();
+    }
+
+    return result;
 }
 
 /**
- * Clear all URIs from the context
+ * Clear all URIs from the context (both manual and auto)
  */
 export function clearContextUris(): void {
-    contextFileUris = [];
+    // Clear manually added URIs
+    manuallyAddedContextUris.clear();
+
+    // Clear auto context URI
+    currentAutoContextUri = null;
+
     console.log('>>> Cleared all URIs from context');
 
     // Sync the updated state to the webview
@@ -162,24 +216,57 @@ export function clearContextUris(): void {
 
 /**
  * Sync the current context state to the webview
- * This should be called after any modification to the contextFileUris array
+ * This should be called after any modification to the context state
  */
 export function syncContextStateToWebview(): void {
     console.log('>>> syncContextStateToWebview called');
-    console.log('>>> Current contextFileUris:', contextFileUris.map(uri => uri.toString()));
+
+    // Get all context URIs (both manual and auto)
+    const allContextUris = getContextFileUris();
+    console.log('>>> Current context URIs:', allContextUris.map(uri => uri.toString()));
 
     if (chatProviderInstance) {
         // Prepare data for the webview
-        const contextPaths = contextFileUris.map(uri => vscode.workspace.asRelativePath(uri));
-        const contextUriStrings = contextFileUris.map(uri => uri.toString());
+        const contextItems = [];
 
-        // Send a dedicated message to update the context pills
+        // Add manually added URIs
+        for (const uriString of manuallyAddedContextUris) {
+            try {
+                const uri = vscode.Uri.parse(uriString);
+                contextItems.push({
+                    uriString: uriString,
+                    path: vscode.workspace.asRelativePath(uri),
+                    isCurrent: false
+                });
+            } catch (error) {
+                console.error(`Error parsing URI string: ${uriString}`, error);
+            }
+        }
+
+        // Add auto context URI if it exists and is not already in the manual set
+        if (currentAutoContextUri) {
+            const autoUriString = currentAutoContextUri.toString();
+            if (!manuallyAddedContextUris.has(autoUriString)) {
+                contextItems.push({
+                    uriString: autoUriString,
+                    path: vscode.workspace.asRelativePath(currentAutoContextUri),
+                    isCurrent: true
+                });
+            }
+        }
+
+        // Extract paths and URI strings for backward compatibility
+        const contextPaths = contextItems.map(item => item.path);
+        const contextUriStrings = contextItems.map(item => item.uriString);
+
+        // Send the new message format with context items
         chatProviderInstance.sendMessageToWebview({
             type: 'updateContextPills',
+            contextItems: contextItems,
             contextPaths: contextPaths,
             contextUriStrings: contextUriStrings
         });
-        console.log(`>>> State Sync: Sent updateContextPills to webview with ${contextPaths.length} files.`);
+        console.log(`>>> State Sync: Sent updateContextPills to webview with ${contextItems.length} files.`);
 
         // Also send the legacy message for backward compatibility
         chatProviderInstance.sendMessageToWebview({
@@ -304,6 +391,43 @@ export async function searchWorkspaceFiles(query: string, maxResults: number = 1
     }
 }
 
+/**
+ * Handle changes to the active editor
+ * This function updates the auto context URI when the active editor changes
+ * @param editor The new active editor
+ */
+export function handleActiveEditorChange(editor: vscode.TextEditor | undefined): void {
+    console.log('>>> handleActiveEditorChange called');
+
+    // Get the old auto context URI
+    const oldAutoUri = currentAutoContextUri;
+
+    // If there's a valid editor with a file
+    if (editor && editor.document && editor.document.uri) {
+        // Check if it's a file in the workspace (not an untitled file or output panel)
+        if (editor.document.uri.scheme === 'file') {
+            // Set the new auto context URI
+            currentAutoContextUri = editor.document.uri;
+            console.log(`>>> Auto context updated to: ${currentAutoContextUri.toString()}`);
+        } else {
+            // Not a valid workspace file, clear the auto context
+            currentAutoContextUri = null;
+            console.log('>>> Auto context cleared (not a workspace file)');
+        }
+    } else {
+        // No active editor, clear the auto context
+        currentAutoContextUri = null;
+        console.log('>>> Auto context cleared (no active editor)');
+    }
+
+    // If the auto context has changed, sync the state to the webview
+    if ((oldAutoUri && !currentAutoContextUri) ||
+        (!oldAutoUri && currentAutoContextUri) ||
+        (oldAutoUri && currentAutoContextUri && oldAutoUri.toString() !== currentAutoContextUri.toString())) {
+        syncContextStateToWebview();
+    }
+}
+
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
@@ -381,11 +505,18 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.window.showInformationMessage('Codexpilot: Context cleared.');
     });
 
+	// Register the event listener for active editor changes
+	const activeEditorChangeDisposable = vscode.window.onDidChangeActiveTextEditor(handleActiveEditorChange);
+
+	// Initialize with the current active editor
+	handleActiveEditorChange(vscode.window.activeTextEditor);
+
 	// Add all disposables to the subscriptions
 	context.subscriptions.push(
         helloWorldCommand,
         setApiKeyCommand,
-        clearContextCommand
+        clearContextCommand,
+        activeEditorChangeDisposable
     );
 }
 

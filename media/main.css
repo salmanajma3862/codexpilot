@@ -389,6 +389,24 @@ body {
     background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground));
 }
 
+/* Current context pill styling */
+.current-context-pill {
+    background-color: var(--vscode-statusBarItem-prominentBackground, var(--vscode-button-background));
+    color: var(--vscode-statusBarItem-prominentForeground, var(--vscode-button-foreground));
+}
+
+/* Current tag styling */
+.current-tag {
+    font-size: 9px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    padding: 1px 4px;
+    margin-left: 4px;
+    text-transform: uppercase;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+}
+
 .pill-filename {
     color: var(--vscode-badge-foreground);
     font-size: 0.9em;

@@ -634,7 +634,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
      * @returns A promise that resolves to a string containing the content of all context files
      */
     private async readContextFiles(): Promise<string> {
-        // Update our local copy of the context URIs
+        // Update our local copy of the context URIs (both manual and auto)
         this._currentContextUris = getContextFileUris();
 
         if (this._currentContextUris.length === 0) {
@@ -993,21 +993,44 @@ Be explanatory and clear in your explanations.`;
      * This method sends the current context URIs to the webview for UI synchronization
      */
     private sendContextUpdateToWebview(): void {
-        // Get the current context URIs
+        // Get the current context URIs (both manual and auto)
         this._currentContextUris = getContextFileUris();
 
-        // Prepare the data for the webview
-        const contextPaths = this._currentContextUris.map(uri => vscode.workspace.asRelativePath(uri));
-        const contextUriStrings = this._currentContextUris.map(uri => uri.toString());
+        // Prepare the context items with isCurrent flag
+        const contextItems = [];
+
+        // Get the current auto context URI if it exists
+        const currentAutoContextUri = vscode.window.activeTextEditor?.document?.uri;
+        const currentAutoContextUriString = currentAutoContextUri?.toString();
+
+        // Process each URI
+        for (const uri of this._currentContextUris) {
+            const uriString = uri.toString();
+            const path = vscode.workspace.asRelativePath(uri);
+
+            // Check if this is the current auto context URI
+            const isCurrent = currentAutoContextUriString === uriString;
+
+            contextItems.push({
+                path,
+                uriString,
+                isCurrent
+            });
+        }
+
+        // Also prepare the legacy format data for backward compatibility
+        const contextPaths = contextItems.map(item => item.path);
+        const contextUriStrings = contextItems.map(item => item.uriString);
 
         // Send the update to the webview
         this.sendMessageToWebview({
             type: 'updateContextPills',
             contextPaths: contextPaths,
-            contextUriStrings: contextUriStrings
+            contextUriStrings: contextUriStrings,
+            contextItems: contextItems
         });
 
-        console.log(`>>> Sent context update to webview with ${contextPaths.length} files`);
+        console.log(`>>> Sent context update to webview with ${contextItems.length} files`);
     }
 
     /**
