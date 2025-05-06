@@ -2,7 +2,7 @@
   "name": "codexpilot",
   "displayName": "Codexpilot",
   "description": "Chat with Google's Gemini AI using codebase context via '@' mentions for intelligent code assistance",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "codexpilot",
   "engines": {
     "vscode": "^1.74.0"

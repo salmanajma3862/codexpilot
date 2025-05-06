@@ -13,7 +13,9 @@ Codexpilot is a VS Code extension that integrates Google's Gemini AI to provide 
 ## Features
 
 - **Google Gemini Integration**: Powered by Google's advanced Gemini 1.5 Pro model for intelligent code understanding and generation
-- **Codebase Context via '@' Mentions**: Easily reference files in your workspace by typing '@' to provide context to the AI
+- **Automatic Context Tracking**: The currently active file is automatically added to the chat context with a toggle to control inclusion
+- **Codebase Context via '@' Mentions**: Easily reference additional files in your workspace by typing '@' to provide context to the AI
+- **Hybrid Context Model**: Combines auto-tracked current file with persistent manually added files for comprehensive context
 - **File Search**: Quick access to recent files or search your entire workspace
 - **Streaming Responses**: See AI responses in real-time as they're generated
 - **Rich Markdown Rendering**: Beautiful formatting with syntax highlighting for code blocks
@@ -66,17 +68,28 @@ Before using Codexpilot, you need to set your Gemini API key:
 1. Type your question or request in the input box at the bottom of the chat view
 2. Press Enter or click the Send button to submit your message
 
-### Adding File Context (@ Mentions)
+### File Context Management
+
+#### Automatic Context Tracking
+
+- The currently active file in your editor is automatically added to the chat context
+- This auto-tracked file is marked as "Current" in the context area
+- You can temporarily exclude the auto-tracked file by clicking the eye icon on its pill
+- The auto-context visibility resets to "included" when you switch to a different file
+
+#### Adding Additional File Context (@ Mentions)
 
 1. Type '@' in your message to trigger the file selector
 2. Choose from recently accessed files or search for a specific file
 3. Select a file to add it to your message context
 4. You can add multiple files by using '@' multiple times
-5. The AI will use these files as context when generating responses
+5. Manually added files persist in the context until explicitly removed
+6. The AI will use all included files (auto-tracked and manually added) as context when generating responses
 
-### Removing File Context
+#### Removing File Context
 
-- Click the 'x' on any file pill in the context area to remove that file from the current context
+- For manually added files: Click the 'x' on any file pill in the context area to remove that file
+- For the auto-tracked file: Use the eye icon to toggle its inclusion without removing it from tracking
 
 ### Interacting with Responses
 
@@ -100,6 +113,13 @@ Before using Codexpilot, you need to set your Gemini API key:
 - Some complex code structures may not be perfectly understood by the AI
 
 ## Release Notes
+
+### 0.1.1
+
+- Added automatic context tracking for the active editor file
+- Added eye icon toggle to control inclusion of auto-tracked file in context
+- Implemented hybrid context model (auto-current + manual persistent)
+- Improved context UI with distinct styling for auto-tracked vs. manually added files
 
 ### 0.1.0
 
