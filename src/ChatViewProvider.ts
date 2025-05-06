@@ -30,6 +30,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     // Current chat ID
     private currentChatId: string | null = null;
 
+    // Selection modification state
+    private activeSelectionModificationInfo?: {
+        documentUri: vscode.Uri;
+        selectionRange: vscode.Range;
+        originalSelectedText: string;
+    };
+
     constructor(
         private readonly _extensionUri: vscode.Uri,
         private readonly _context: vscode.ExtensionContext,
@@ -159,6 +166,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                         // Frontend is requesting a context update
                         console.log('>>> Received requestContextUpdate');
                         this.sendContextUpdateToWebview();
+                        break;
+
+                    case 'getActiveSelectionInfo':
+                        // User wants to modify selected code
+                        console.log('Received getActiveSelectionInfo request');
+                        await this.handleGetActiveSelectionInfo();
+                        break;
+
+                    case 'applySelectionModification':
+                        // User wants to apply a code modification to the selection
+                        if (!message.suggestedCode || typeof message.suggestedCode !== 'string') {
+                            throw new Error('Invalid suggested code');
+                        }
+                        console.log('Received applySelectionModification request');
+                        await this.handleApplySelectionModification(message.suggestedCode);
                         break;
 
                     default:
@@ -680,11 +702,23 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
             // Read the content of all files in the context
             const contextContent = await this.readContextFiles();
 
+            // Check if this query is for selection modification
+            const isForSelection = !!this.activeSelectionModificationInfo;
+
             // Define the system message that sets the AI's behavior and tone
-            const systemMessage = `You are a helpful coding assistant in an IDE. You help users understand and modify code.
+            let systemMessage = `You are a helpful coding assistant in an IDE. You help users understand and modify code.
 Be explanatory and clear in your explanations.
 When showing code examples, use proper formatting with markdown.
 If the user asks about code and there's no context provided, just answer based on your general knowledge.`;
+
+            // If this is a selection modification request, add specific instructions
+            if (isForSelection) {
+                systemMessage = `You are a helpful coding assistant in an IDE. You help users modify code.
+IMPORTANT: The user has provided a specific code snippet selected from their editor. Modify *only* this provided code snippet based on the user's request below it.
+Do not add imports or other code outside the snippet scope in the final code block; describe those separately if needed.
+Always include the complete modified code in a single markdown code block with the appropriate language tag.
+Be explanatory and clear in your explanations.`
+            }
 
             // Check if we have actual context files or just the default "no context" message
             const hasRealContext = contextContent !== "No context files provided.";
@@ -777,7 +811,11 @@ If the user asks about code and there's no context provided, just answer based o
             console.log(`Conversation history now has ${this.conversationHistory.length} messages`);
 
             // Signal the webview that the stream has ended
-            this.sendMessageToWebview({ type: 'geminiStreamEnd' });
+            // Include the isSelectionModification flag if this was a selection modification request
+            this.sendMessageToWebview({
+                type: 'geminiStreamEnd',
+                isSelectionModification: isForSelection
+            });
 
         } catch (error: any) {
             // Log and handle any errors that occur during processing
@@ -828,6 +866,115 @@ If the user asks about code and there's no context provided, just answer based o
         } catch (error) {
             console.error('Error inserting code:', error);
             vscode.window.showErrorMessage('Failed to insert code: ' + (error instanceof Error ? error.message : 'Unknown error'));
+        }
+    }
+
+    /**
+     * Handle getting information about the active text selection
+     * This is called when the user clicks the "Modify Selection" button
+     */
+    private async handleGetActiveSelectionInfo(): Promise<void> {
+        // Get the active text editor
+        const editor = vscode.window.activeTextEditor;
+
+        if (!editor) {
+            // No active editor, show a warning
+            vscode.window.showWarningMessage('No active editor found. Please open a file and select some code first.');
+            return;
+        }
+
+        // Check if there is a selection
+        if (editor.selection.isEmpty) {
+            vscode.window.showWarningMessage('No code selected. Please select some code first.');
+            return;
+        }
+
+        try {
+            // Get the selection range
+            const selectionRange = editor.selection;
+
+            // Get the selected text
+            const selectedText = editor.document.getText(selectionRange);
+
+            // Get the document URI
+            const documentUri = editor.document.uri;
+
+            // Get the language ID
+            const languageId = editor.document.languageId;
+
+            // Store the selection info for later use
+            this.activeSelectionModificationInfo = {
+                documentUri,
+                selectionRange,
+                originalSelectedText: selectedText
+            };
+
+            // Send the selection info to the webview
+            this.sendMessageToWebview({
+                type: 'populateModificationInput',
+                selectedText,
+                languageId
+            });
+
+            console.log('Sent selection info to webview:', {
+                textLength: selectedText.length,
+                languageId,
+                uri: documentUri.toString()
+            });
+        } catch (error) {
+            console.error('Error getting selection info:', error);
+            vscode.window.showErrorMessage('Failed to get selection info: ' + (error instanceof Error ? error.message : 'Unknown error'));
+        }
+    }
+
+    /**
+     * Handle applying a code modification to the active selection
+     * @param suggestedCode The modified code to apply to the selection
+     */
+    private async handleApplySelectionModification(suggestedCode: string): Promise<void> {
+        // Check if we have stored selection info
+        if (!this.activeSelectionModificationInfo) {
+            vscode.window.showErrorMessage('Original selection information not found. Please try selecting the code again.');
+            return;
+        }
+
+        try {
+            const { documentUri, selectionRange } = this.activeSelectionModificationInfo;
+
+            // Create a workspace edit
+            const edit = new vscode.WorkspaceEdit();
+
+            // Replace the selected text with the suggested code
+            edit.replace(documentUri, selectionRange, suggestedCode);
+
+            // Apply the edit
+            const success = await vscode.workspace.applyEdit(edit);
+
+            if (success) {
+                // Show a success message
+                vscode.window.showInformationMessage('Code modification applied successfully.');
+
+                // Try to format the document if possible
+                try {
+                    const editor = vscode.window.activeTextEditor;
+                    if (editor && editor.document.uri.toString() === documentUri.toString()) {
+                        await vscode.commands.executeCommand('editor.action.formatDocument');
+                    }
+                } catch (formatError) {
+                    console.log('Format after modification failed (non-critical):', formatError);
+                }
+            } else {
+                vscode.window.showErrorMessage('Failed to apply code modification.');
+            }
+
+            // Clear the stored selection info
+            this.activeSelectionModificationInfo = undefined;
+        } catch (error) {
+            console.error('Error applying code modification:', error);
+            vscode.window.showErrorMessage('Failed to apply code modification: ' + (error instanceof Error ? error.message : 'Unknown error'));
+
+            // Clear the stored selection info even on error
+            this.activeSelectionModificationInfo = undefined;
         }
     }
 
@@ -987,6 +1134,10 @@ If the user asks about code and there's no context provided, just answer based o
                             <!-- Context Add Button -->
                             <button id="context-add-button" title="Add File Context">
                                 <i class="codicon codicon-mention"></i>
+                            </button>
+                            <!-- Modify Selection Button -->
+                            <button id="modify-selection-button" title="Modify Selected Code">
+                                <i class="codicon codicon-wand"></i>
                             </button>
                         </div>
                         <div id="action-buttons-right">

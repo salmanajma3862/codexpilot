@@ -12,6 +12,7 @@
     const modePickerButton = document.getElementById('mode-picker-button');
     const modeDropdown = document.getElementById('mode-dropdown');
     const contextAddButton = document.getElementById('context-add-button');
+    const modifySelectionButton = document.getElementById('modify-selection-button');
     const newChatButton = document.getElementById('new-chat-button');
     const historyButton = document.getElementById('history-button');
     const settingsButton = document.getElementById('settings-button');
@@ -135,6 +136,13 @@
 
         // Focus the input
         userInputElement.focus();
+    });
+
+    // Modify Selection button functionality
+    modifySelectionButton.addEventListener('click', () => {
+        console.log('Modify Selection button clicked');
+        // Send message to extension to get the active selection info
+        vscode.postMessage({ type: 'getActiveSelectionInfo' });
     });
 
     // Close dropdown when clicking outside
@@ -662,8 +670,11 @@
 
                     case 'geminiStreamEnd':
                         console.log('Handling geminiStreamEnd');
+                        // Check if this is a selection modification response
+                        const isSelectionModification = message.isSelectionModification === true;
+                        console.log('Is selection modification:', isSelectionModification);
                         // Finalize the response with markdown rendering
-                        finalizeStreamingResponse();
+                        finalizeStreamingResponse(isSelectionModification);
                         break;
 
                     case 'geminiResponse':
@@ -735,6 +746,15 @@
                         }
                         console.log('Handling restoreContextPills');
                         restoreContextPills(message.contextPaths, message.contextUriStrings);
+                        break;
+
+                    case 'populateModificationInput':
+                        if (!message.selectedText) {
+                            console.error('Missing selectedText in populateModificationInput:', message);
+                            return;
+                        }
+                        console.log('Handling populateModificationInput');
+                        handlePopulateModificationInput(message.selectedText, message.languageId);
                         break;
 
                     default:
@@ -1435,7 +1455,7 @@
     }
 
     // Function to finalize the streaming response with markdown rendering
-    function finalizeStreamingResponse() {
+    function finalizeStreamingResponse(isSelectionModification = false) {
         // Stop any ongoing animation first
         stopCharacterAnimation();
 
@@ -1446,6 +1466,7 @@
 
         try {
             console.log('Finalizing streaming response with markdown rendering');
+            console.log('Is selection modification:', isSelectionModification);
 
             // Get the text element
             const textElement = currentAssistantMessageElement.querySelector('.message-text');
@@ -1569,6 +1590,41 @@
                             // Add buttons to button container
                             buttonContainer.appendChild(copyButton);
                             buttonContainer.appendChild(insertButton);
+
+                            // If this is a selection modification response, add an "Apply to Selection" button
+                            if (isSelectionModification) {
+                                // Create Apply to Selection button
+                                const applyButton = document.createElement('button');
+                                applyButton.className = 'apply-selection-button';
+                                applyButton.innerHTML = '<i class="codicon codicon-check"></i> Apply';
+                                applyButton.title = 'Apply this code to your selection';
+
+                                // Store the code text in a data attribute for easy access
+                                applyButton.dataset.suggestedCode = codeBlock.textContent;
+
+                                // Add event listener for Apply button
+                                applyButton.addEventListener('click', () => {
+                                    // Get the suggested code from the data attribute
+                                    const suggestedCode = applyButton.dataset.suggestedCode;
+
+                                    // Send message to extension to apply the modification
+                                    vscode.postMessage({
+                                        type: 'applySelectionModification',
+                                        suggestedCode: suggestedCode
+                                    });
+
+                                    // Show feedback
+                                    applyButton.innerHTML = '<i class="codicon codicon-loading codicon-modifier-spin"></i> Applying...';
+
+                                    // Reset after 2 seconds
+                                    setTimeout(() => {
+                                        applyButton.innerHTML = '<i class="codicon codicon-check"></i> Apply';
+                                    }, 2000);
+                                });
+
+                                // Add the Apply button to the button container
+                                buttonContainer.appendChild(applyButton);
+                            }
 
                             // Wrap the pre block with our container
                             preBlock.parentNode.insertBefore(codeContainer, preBlock);
@@ -1834,6 +1890,39 @@
     loadState();
 
     // Function to show a temporary notification in the webview
+    /**
+     * Handle populating the input with the selected code
+     * @param {string} selectedText The selected code text
+     * @param {string} languageId The language ID of the selected code
+     */
+    function handlePopulateModificationInput(selectedText, languageId) {
+        if (!selectedText) {
+            console.error('No selected text provided');
+            return;
+        }
+
+        // Format the selected text as a code block with the language ID
+        const formattedText = '```' + (languageId || '') + '\n' + selectedText + '\n```\n\nModify this code: ';
+
+        // Set the input value
+        userInputElement.value = formattedText;
+
+        // Set cursor position at the end
+        userInputElement.setSelectionRange(formattedText.length, formattedText.length);
+
+        // Focus the input
+        userInputElement.focus();
+
+        // Resize the textarea
+        autoResizeTextarea();
+
+        console.log('Input populated with selected code');
+    }
+
+    /**
+     * Show a temporary notification in the webview
+     * @param {string} message The message to display
+     */
     function showTemporaryNotification(message) {
         // Create notification element
         const notification = document.createElement('div');

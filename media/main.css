@@ -333,7 +333,7 @@ body {
 }
 
 /* Context Add Button */
-#context-add-button {
+#context-add-button, #modify-selection-button {
     background-color: transparent; /* Transparent background to blend with input area */
     border: none;
     border-radius: 3px;
@@ -348,11 +348,11 @@ body {
     line-height: 1; /* Consistent line height */
 }
 
-#context-add-button:hover {
+#context-add-button:hover, #modify-selection-button:hover {
     background-color: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
 }
 
-#context-add-button .codicon {
+#context-add-button .codicon, #modify-selection-button .codicon {
     font-size: 14px;
 }
 
@@ -918,6 +918,35 @@ body {
 
 .copy-button.copied {
     background-color: var(--vscode-statusBarItem-prominentBackground, var(--vscode-button-background));
+}
+
+/* Apply to Selection button */
+.apply-selection-button {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 3px;
+    padding: 3px 6px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: background-color 0.15s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 4px;
+}
+
+.apply-selection-button .codicon {
+    font-size: 14px;
+    line-height: 1;
+}
+
+.apply-selection-button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+.apply-selection-button:active {
+    opacity: 0.9;
 }
 
 /* Codicon animation for loading spinner */
