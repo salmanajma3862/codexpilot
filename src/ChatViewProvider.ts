@@ -1156,7 +1156,6 @@ Be explanatory and clear in your explanations.`;
                     <!-- Textarea for user input -->
                     <div class="input-container">
                         <textarea id="user-input" placeholder="Ask Codexpilot..."></textarea>
-                        <span id="char-counter" class="char-counter"></span>
                     </div>
 
                     <!-- Action buttons row inside the main input area -->
