@@ -1,6 +1,9 @@
 // Codexpilot JavaScript
 
 (function() {
+    // Constants
+    const MAX_INPUT_LENGTH = 4000; // Maximum character limit for input
+
     // Get VS Code API
     const vscode = acquireVsCodeApi();
 
@@ -16,6 +19,7 @@
     const newChatButton = document.getElementById('new-chat-button');
     const historyButton = document.getElementById('history-button');
     const settingsButton = document.getElementById('settings-button');
+    const charCounterElement = document.getElementById('char-counter');
 
     // Create file search results container
     const fileSearchContainer = document.createElement('div');
@@ -38,6 +42,12 @@
     let isAnimating = false; // Flag to prevent multiple animation loops
     let animationIntervalId = null; // To store the interval ID
     const charAnimationDelay = 10; // Milliseconds between characters (adjust for speed)
+
+    // Initialize UI state
+    sendButtonElement.disabled = true; // Start with send button disabled
+    if (charCounterElement) {
+        charCounterElement.textContent = `0 / ${MAX_INPUT_LENGTH}`; // Initialize character counter
+    }
 
     // Event listeners
     sendButtonElement.addEventListener('click', sendMessage);
@@ -188,6 +198,32 @@
     function handleInputChange() {
         const text = userInputElement.value;
         const cursorPosition = userInputElement.selectionStart;
+        const currentLength = text.length;
+
+        // Update character counter
+        if (charCounterElement) {
+            charCounterElement.textContent = `${currentLength} / ${MAX_INPUT_LENGTH}`;
+
+            // Check if the length exceeds the maximum
+            if (currentLength > MAX_INPUT_LENGTH) {
+                // Add visual indicator
+                userInputElement.classList.add('textarea-error');
+                charCounterElement.classList.add('char-counter-error');
+
+                // Optional: Trim the input back to the max length
+                // userInputElement.value = text.slice(0, MAX_INPUT_LENGTH);
+                // currentLength = MAX_INPUT_LENGTH;
+                // charCounterElement.textContent = `${currentLength} / ${MAX_INPUT_LENGTH}`;
+            } else {
+                // Remove visual indicator if it exists
+                userInputElement.classList.remove('textarea-error');
+                charCounterElement.classList.remove('char-counter-error');
+            }
+        }
+
+        // Enable/disable send button based on content
+        const isEmpty = text.trim() === '';
+        sendButtonElement.disabled = isEmpty;
 
         // Find the @ symbol before the cursor
         const textBeforeCursor = text.substring(0, cursorPosition);
@@ -904,6 +940,18 @@
                 // Clear input
                 userInputElement.value = '';
 
+                // Update character counter
+                if (charCounterElement) {
+                    charCounterElement.textContent = `0 / ${MAX_INPUT_LENGTH}`;
+                    charCounterElement.classList.remove('char-counter-error');
+                }
+
+                // Disable send button
+                sendButtonElement.disabled = true;
+
+                // Remove any error styling
+                userInputElement.classList.remove('textarea-error');
+
                 // Resize the textarea
                 autoResizeTextarea();
             } catch (cleanupError) {
@@ -1209,6 +1257,24 @@
 
         // Clear chat history array
         chatHistory = [];
+
+        // Clear input field
+        userInputElement.value = '';
+
+        // Reset character counter
+        if (charCounterElement) {
+            charCounterElement.textContent = `0 / ${MAX_INPUT_LENGTH}`;
+            charCounterElement.classList.remove('char-counter-error');
+        }
+
+        // Disable send button
+        sendButtonElement.disabled = true;
+
+        // Remove any error styling
+        userInputElement.classList.remove('textarea-error');
+
+        // Resize the textarea
+        autoResizeTextarea();
 
         // Add a system message
         addSystemMessage('New chat started');

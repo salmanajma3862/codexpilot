@@ -468,6 +468,11 @@ body {
     opacity: 1;
 }
 
+.input-container {
+    position: relative;
+    width: 100%;
+}
+
 #user-input {
     width: 100%;
     min-height: 24px; /* Reduced minimum height */
@@ -491,6 +496,27 @@ body {
 #user-input::placeholder {
     color: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
     opacity: 0.7;
+}
+
+#user-input.textarea-error {
+    border-color: var(--vscode-inputValidation-errorBorder);
+    background-color: var(--vscode-inputValidation-errorBackground, rgba(255, 0, 0, 0.1));
+}
+
+.char-counter {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.char-counter-error {
+    color: var(--vscode-errorForeground, var(--vscode-inputValidation-errorBorder));
+    opacity: 1;
 }
 
 #send-button {
@@ -520,6 +546,12 @@ body {
 #send-button:active {
     background-color: var(--vscode-button-background);
     opacity: 0.9;
+}
+
+#send-button:disabled {
+    background-color: var(--vscode-disabledForeground, var(--vscode-button-background));
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* File Search Styles */
