@@ -35,6 +35,7 @@
     let currentAssistantMessageElement = null;
     let accumulatedResponseText = '';
     let currentMode = 'chat'; // Default mode
+    let lastSentQuery = ''; // Store the last query sent to restore after stopping generation
 
     // Animation state for smooth character-by-character display
     let characterQueue = []; // Stores characters to be displayed
@@ -749,10 +750,13 @@
                         // Check if this is a selection modification response
                         const isSelectionModification = message.isSelectionModification === true;
                         console.log('Is selection modification:', isSelectionModification);
+                        // Check if this was stopped by user
+                        const stoppedByUser = message.stoppedByUser === true;
+                        console.log('Was stopped by user:', stoppedByUser);
                         // Finalize the response with markdown rendering
                         finalizeStreamingResponse(isSelectionModification);
                         // Reset the send button
-                        resetSendButton();
+                        resetSendButton(stoppedByUser);
                         break;
 
                     case 'geminiResponse':
@@ -764,8 +768,8 @@
                         // This is for backward compatibility or non-streaming responses
                         hideThinkingIndicator();
                         addChatMessage('assistant', message.text);
-                        // Reset the send button
-                        resetSendButton();
+                        // Reset the send button (not stopped by user)
+                        resetSendButton(false);
                         break;
 
                     case 'geminiError':
@@ -784,8 +788,8 @@
                             accumulatedResponseText = '';
                         }
                         showErrorMessage(message.text || 'An unknown error occurred');
-                        // Reset the send button
-                        resetSendButton();
+                        // Reset the send button (not stopped by user)
+                        resetSendButton(false);
                         break;
 
                     case 'geminiFinishedThinking':
@@ -803,8 +807,8 @@
                             // Add a note that generation was stopped
                             addSystemMessage('Generation stopped by user');
                         }
-                        // Reset the send button
-                        resetSendButton();
+                        // Reset the send button with stoppedByUser=true to restore the query
+                        resetSendButton(true);
                         break;
 
                     case 'clearChat':
@@ -974,6 +978,10 @@
             }
 
             try {
+                // Store the query before clearing it
+                lastSentQuery = text;
+                console.log('Stored last sent query:', lastSentQuery);
+
                 // Clear input
                 userInputElement.value = '';
 
@@ -998,8 +1006,9 @@
 
     /**
      * Reset the send button to its original state
+     * @param {boolean} stoppedByUser - Whether the generation was stopped by the user
      */
-    function resetSendButton() {
+    function resetSendButton(stoppedByUser = false) {
         // Change the button back to send icon
         sendButtonElement.innerHTML = '<span class="codicon codicon-send"></span>';
         sendButtonElement.classList.remove('stop-button');
@@ -1009,6 +1018,14 @@
 
         // Remove the processing class
         document.getElementById('input-area').classList.remove('processing');
+
+        // If stopped by user, restore the last query
+        if (stoppedByUser && lastSentQuery) {
+            console.log('Restoring last query:', lastSentQuery);
+            userInputElement.value = lastSentQuery;
+            // Clear lastSentQuery to avoid restoring it again
+            lastSentQuery = '';
+        }
 
         // Re-evaluate if the send button should be disabled
         sendButtonElement.disabled = userInputElement.value.trim() === '';

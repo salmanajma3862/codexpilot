@@ -852,23 +852,41 @@ Be explanatory and clear in your explanations.`;
 
             // Signal the webview that the stream has ended
             // Include the isSelectionModification flag if this was a selection modification request
+            // Include stoppedByUser=false to indicate normal completion
             this.sendMessageToWebview({
                 type: 'geminiStreamEnd',
-                isSelectionModification: isForSelection
+                isSelectionModification: isForSelection,
+                stoppedByUser: false
             });
 
         } catch (error: any) {
             // Log and handle any errors that occur during processing
             console.error('Error handling user query:', error);
 
-            // Send the error message to the webview
-            this.sendMessageToWebview({
-                type: 'geminiError',
-                text: error.message || 'An unknown error occurred'
-            });
+            // Check if this was an abort error (user stopped generation)
+            const isAbortError = error.name === 'AbortError' || error.message?.includes('aborted');
 
-            // Also send stream end to clean up UI state if needed
-            this.sendMessageToWebview({ type: 'geminiStreamEnd' });
+            if (isAbortError) {
+                console.log('API call aborted by user action.');
+
+                // Send stream end WITH the stoppedByUser flag
+                this.sendMessageToWebview({
+                    type: 'geminiStreamEnd',
+                    stoppedByUser: true
+                });
+            } else {
+                // Send the error message to the webview for other errors
+                this.sendMessageToWebview({
+                    type: 'geminiError',
+                    text: error.message || 'An unknown error occurred'
+                });
+
+                // Also send stream end to clean up UI state if needed (not stopped by user)
+                this.sendMessageToWebview({
+                    type: 'geminiStreamEnd',
+                    stoppedByUser: false
+                });
+            }
         } finally {
             // Always reset the processing flag when done
             this._isProcessingMessage = false;
