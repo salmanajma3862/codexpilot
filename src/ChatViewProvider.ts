@@ -23,6 +23,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     private _currentContextUris: vscode.Uri[] = [];
     private _isProcessingMessage: boolean = false;
 
+    // AbortController for cancelling API requests
+    private currentApiAbortController: AbortController | null = null;
+
     // Conversation history for Gemini API
     private conversationHistory: ChatMessage[] = [];
     private readonly MAX_HISTORY_LENGTH = 20; // Keep last 20 messages (10 turns)
@@ -189,6 +192,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                         }
                         console.log('Received applySelectionModification request');
                         await this.handleApplySelectionModification(message.suggestedCode);
+                        break;
+
+                    case 'stopGeneration':
+                        // User wants to stop the current generation
+                        console.log('Stop generation request received');
+                        if (this.currentApiAbortController) {
+                            console.log('Aborting current API request');
+                            this.currentApiAbortController.abort();
+                            // Send a message to the webview that generation was stopped by user
+                            this.sendMessageToWebview({ type: 'generationStoppedByUser' });
+                        } else {
+                            console.log('No active API request to abort');
+                        }
                         break;
 
                     default:
@@ -781,24 +797,40 @@ Be explanatory and clear in your explanations.`;
             // Log the last turn being sent for verification
             console.log('>>> History: Last turn being sent:', JSON.stringify(historyForApi.slice(-1)[0]));
 
-            // Call the Gemini API with streaming enabled
-            // This sends the conversation history and system message to the API
-            // and processes the response in chunks for a better user experience
-            await callGeminiApiStream(
-                apiKey,
-                historyForApi, // Use the prepared history
-                systemMessage,
-                (chunk: string) => {
-                    // Accumulate the complete response
-                    completeResponseText += chunk;
+            // Cancel any previous, potentially lingering controller
+            if (this.currentApiAbortController) {
+                console.log('Cancelling previous API request');
+                this.currentApiAbortController.abort();
+                this.currentApiAbortController = null;
+            }
 
-                    // Send each chunk to the webview for real-time display
-                    this.sendMessageToWebview({
-                        type: 'geminiResponseChunk',
-                        chunk: chunk
-                    });
-                }
-            );
+            // Create a new AbortController for this request
+            this.currentApiAbortController = new AbortController();
+
+            try {
+                // Call the Gemini API with streaming enabled
+                // This sends the conversation history and system message to the API
+                // and processes the response in chunks for a better user experience
+                await callGeminiApiStream(
+                    apiKey,
+                    historyForApi, // Use the prepared history
+                    systemMessage,
+                    (chunk: string) => {
+                        // Accumulate the complete response
+                        completeResponseText += chunk;
+
+                        // Send each chunk to the webview for real-time display
+                        this.sendMessageToWebview({
+                            type: 'geminiResponseChunk',
+                            chunk: chunk
+                        });
+                    },
+                    this.currentApiAbortController.signal // Pass the abort signal
+                );
+            } finally {
+                // Clear the controller reference
+                this.currentApiAbortController = null;
+            }
 
             // Add the assistant's complete response to the conversation history
             this.conversationHistory.push({

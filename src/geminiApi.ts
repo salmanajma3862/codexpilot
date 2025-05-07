@@ -91,13 +91,15 @@ export async function callGeminiApi(apiKey: string, prompt: string): Promise<str
  * @param promptOrHistory The prompt string or conversation history to send to the API
  * @param systemInstruction Optional system instruction for the model
  * @param onChunk Callback function to handle each chunk of the response
+ * @param signal Optional AbortSignal to cancel the request
  * @returns A promise that resolves when the stream is complete
  */
 export async function callGeminiApiStream(
     apiKey: string,
     promptOrHistory: string | { role: 'user' | 'model', parts: [{ text: string }] }[],
     systemInstructionOrCallback?: string | ((chunk: string) => void),
-    onChunkCallback?: (chunk: string) => void
+    onChunkCallback?: (chunk: string) => void,
+    signal?: AbortSignal
 ): Promise<void> {
     // Determine if we're using conversation history or a simple prompt
     const isUsingHistory = typeof promptOrHistory !== 'string';
@@ -134,6 +136,11 @@ export async function callGeminiApiStream(
             // Generate content stream based on input type
             let result;
 
+            // Check if the request has been aborted before making the API call
+            if (signal?.aborted) {
+                throw new Error('Request aborted by user');
+            }
+
             if (isUsingHistory) {
                 // Using conversation history
                 console.log(`>>> GeminiAPI: Using conversation history with ${(promptOrHistory as any[]).length} messages`);
@@ -144,18 +151,18 @@ export async function callGeminiApiStream(
                     result = await model.generateContentStream({
                         contents: promptOrHistory,
                         systemInstruction: systemInstruction
-                    });
+                    }, { signal });
                 } else {
                     // Without system instruction
                     console.log('>>> GeminiAPI: No system instruction provided');
                     result = await model.generateContentStream({
                         contents: promptOrHistory
-                    });
+                    }, { signal });
                 }
             } else {
                 // Using simple prompt string
                 console.log(">>> GeminiAPI: Using simple prompt string");
-                result = await model.generateContentStream(promptOrHistory as string);
+                result = await model.generateContentStream(promptOrHistory as string, { signal });
             }
 
             // Process the stream
@@ -182,6 +189,13 @@ export async function callGeminiApiStream(
 
         } catch (error: any) {
             console.error(`Gemini API attempt ${attempt} failed:`, error);
+
+            // Check if this is an abort error
+            if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+                console.log('Request was aborted by user');
+                // Don't retry aborted requests
+                throw new Error('Request aborted by user');
+            }
 
             // Determine if this is a retryable error
             const isRetryable = isRetryableError(error);

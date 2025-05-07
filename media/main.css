@@ -538,6 +538,27 @@ body {
     cursor: not-allowed;
 }
 
+/* Stop button styling */
+#send-button.stop-button {
+    background-color: var(--vscode-inputValidation-errorBackground, var(--vscode-errorForeground));
+    color: var(--vscode-inputValidation-errorForeground, var(--vscode-editor-background));
+    width: auto;
+    padding: 4px 8px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+#send-button.stop-button:hover {
+    background-color: var(--vscode-inputValidation-errorBorder, var(--vscode-errorForeground));
+}
+
+/* Processing state for input area */
+#input-area.processing {
+    border-color: var(--vscode-focusBorder, var(--vscode-button-background));
+}
+
 /* File Search Styles */
 .file-search-container {
     background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));

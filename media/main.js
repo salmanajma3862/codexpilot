@@ -46,7 +46,7 @@
     sendButtonElement.disabled = true; // Start with send button disabled
 
     // Event listeners
-    sendButtonElement.addEventListener('click', sendMessage);
+    sendButtonElement.addEventListener('click', handleSendButtonClick);
     userInputElement.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             // If the file search is open, don't send the message
@@ -55,7 +55,7 @@
                 return;
             }
             e.preventDefault();
-            sendMessage();
+            handleSendButtonClick();
         } else if (e.key === 'Escape') {
             // Close the file search if it's open
             if (fileSearchContainer.style.display === 'block') {
@@ -751,6 +751,8 @@
                         console.log('Is selection modification:', isSelectionModification);
                         // Finalize the response with markdown rendering
                         finalizeStreamingResponse(isSelectionModification);
+                        // Reset the send button
+                        resetSendButton();
                         break;
 
                     case 'geminiResponse':
@@ -762,6 +764,8 @@
                         // This is for backward compatibility or non-streaming responses
                         hideThinkingIndicator();
                         addChatMessage('assistant', message.text);
+                        // Reset the send button
+                        resetSendButton();
                         break;
 
                     case 'geminiError':
@@ -780,11 +784,27 @@
                             accumulatedResponseText = '';
                         }
                         showErrorMessage(message.text || 'An unknown error occurred');
+                        // Reset the send button
+                        resetSendButton();
                         break;
 
                     case 'geminiFinishedThinking':
                         console.log('Handling geminiFinishedThinking');
                         hideThinkingIndicator();
+                        break;
+
+                    case 'generationStoppedByUser':
+                        console.log('Handling generationStoppedByUser');
+                        // Stop any ongoing animation
+                        stopCharacterAnimation();
+                        // If we were in the middle of streaming, finalize what we have
+                        if (currentAssistantMessageElement) {
+                            finalizeStreamingResponse(false);
+                            // Add a note that generation was stopped
+                            addSystemMessage('Generation stopped by user');
+                        }
+                        // Reset the send button
+                        resetSendButton();
                         break;
 
                     case 'clearChat':
@@ -868,6 +888,25 @@
     });
 
     // Functions
+
+    /**
+     * Handle send button click - either send a message or stop generation
+     */
+    function handleSendButtonClick() {
+        // Check if the button is in "stop" mode
+        if (sendButtonElement.classList.contains('stop-button')) {
+            // Send stop generation message to the extension
+            console.log('Stopping generation...');
+            vscode.postMessage({ type: 'stopGeneration' });
+        } else {
+            // Normal send message flow
+            sendMessage();
+        }
+    }
+
+    /**
+     * Send a message to the extension
+     */
     function sendMessage() {
         try {
             const text = userInputElement.value.trim();
@@ -917,6 +956,17 @@
                     type: 'sendMessage',
                     text: text
                 });
+
+                // Change the send button to a stop button
+                sendButtonElement.innerHTML = '<span class="codicon codicon-debug-stop"></span> Stop';
+                sendButtonElement.classList.add('stop-button');
+
+                // Disable the textarea
+                userInputElement.disabled = true;
+
+                // Add a processing class to the input area
+                document.getElementById('input-area').classList.add('processing');
+
             } catch (sendError) {
                 console.error('Error sending message to extension:', sendError);
                 showErrorMessage('Failed to send message to the extension. Please reload the extension.');
@@ -926,9 +976,6 @@
             try {
                 // Clear input
                 userInputElement.value = '';
-
-                // Disable send button
-                sendButtonElement.disabled = true;
 
                 // Remove any error styling
                 userInputElement.classList.remove('textarea-error');
@@ -947,6 +994,24 @@
                 console.error('Failed to show error message:', finalError);
             }
         }
+    }
+
+    /**
+     * Reset the send button to its original state
+     */
+    function resetSendButton() {
+        // Change the button back to send icon
+        sendButtonElement.innerHTML = '<span class="codicon codicon-send"></span>';
+        sendButtonElement.classList.remove('stop-button');
+
+        // Re-enable the textarea
+        userInputElement.disabled = false;
+
+        // Remove the processing class
+        document.getElementById('input-area').classList.remove('processing');
+
+        // Re-evaluate if the send button should be disabled
+        sendButtonElement.disabled = userInputElement.value.trim() === '';
     }
 
     function addChatMessage(sender, text, contextFiles = []) {
