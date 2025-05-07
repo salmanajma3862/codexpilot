@@ -200,8 +200,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
                         if (this.currentApiAbortController) {
                             console.log('Aborting current API request');
                             this.currentApiAbortController.abort();
-                            // Send a message to the webview that generation was stopped by user
-                            this.sendMessageToWebview({ type: 'generationStoppedByUser' });
+                            // No longer sending a separate message - the AbortError handler will send geminiStreamEnd with stoppedByUser flag
                         } else {
                             console.log('No active API request to abort');
                         }

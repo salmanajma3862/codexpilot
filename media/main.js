@@ -753,9 +753,30 @@
                         // Check if this was stopped by user
                         const stoppedByUser = message.stoppedByUser === true;
                         console.log('Was stopped by user:', stoppedByUser);
-                        // Finalize the response with markdown rendering
-                        finalizeStreamingResponse(isSelectionModification);
-                        // Reset the send button
+
+                        // If stopped by user, replace the loading message with "Stopped."
+                        if (stoppedByUser && currentAssistantMessageElement) {
+                            // Stop any ongoing animation
+                            stopCharacterAnimation();
+
+                            // Replace the content with a simple "Stopped." message
+                            const textElement = currentAssistantMessageElement.querySelector('.message-text');
+                            if (textElement) {
+                                textElement.innerHTML = '<p class="stopped-message">Stopped.</p>';
+                            }
+
+                            // Remove any loading-specific classes
+                            currentAssistantMessageElement.classList.remove('streaming-message');
+
+                            // Clear the reference to the message element
+                            currentAssistantMessageElement = null;
+                            accumulatedResponseText = '';
+                        } else {
+                            // Normal finalization with markdown rendering
+                            finalizeStreamingResponse(isSelectionModification);
+                        }
+
+                        // Reset the send button (restore query if stopped by user)
                         resetSendButton(stoppedByUser);
                         break;
 
@@ -797,19 +818,7 @@
                         hideThinkingIndicator();
                         break;
 
-                    case 'generationStoppedByUser':
-                        console.log('Handling generationStoppedByUser');
-                        // Stop any ongoing animation
-                        stopCharacterAnimation();
-                        // If we were in the middle of streaming, finalize what we have
-                        if (currentAssistantMessageElement) {
-                            finalizeStreamingResponse(false);
-                            // Add a note that generation was stopped
-                            addSystemMessage('Generation stopped by user');
-                        }
-                        // Reset the send button with stoppedByUser=true to restore the query
-                        resetSendButton(true);
-                        break;
+                    // 'generationStoppedByUser' handler removed - now handled in geminiStreamEnd with stoppedByUser flag
 
                     case 'clearChat':
                         console.log('Handling clearChat');

@@ -706,6 +706,15 @@ body {
     display: none;
 }
 
+/* Styling for the stopped message */
+.stopped-message {
+    font-style: italic;
+    opacity: 0.8;
+    color: var(--vscode-descriptionForeground);
+    margin: 0;
+    padding: 8px;
+}
+
 /* Error Message Styles */
 .error-message {
     align-self: center;
